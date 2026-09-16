@@ -42,3 +42,30 @@ A existência simultânea desses dois cenários não significa que a redistribui
 No Brasil, a redistribuição de alimentos já acontece por meio de diferentes iniciativas. A **Rede Brasileira de Bancos de Alimentos (RBBA)** arrecadou **mais de 72,9 mil toneladas de alimentos em 2024**, demonstrando a existência de um ecossistema real envolvendo doadores, bancos de alimentos, instituições receptoras e beneficiários.
 
 A relevância desse processo também é reconhecida pela legislação brasileira. A **Lei nº 15.224, de 30 de setembro de 2025**, instituiu a Política Nacional de Combate à Perda e ao Desperdício de Alimentos (PNCPDA). Entre seus princípios está o incentivo ao uso de soluções, como aplicativos e sites, capazes de aproximar aqueles que desejam doar daqueles que desejam receber alimentos.
+
+## O problema
+
+Disponibilizar um alimento para doação não significa necessariamente que ele será efetivamente redistribuído.
+
+Para que isso aconteça, diferentes informações e participantes precisam ser coordenados:
+
+- qual alimento está disponível;
+- qual a quantidade;
+- onde ele está localizado;
+- até quando poderá ser retirado;
+- qual instituição possui interesse;
+- qual instituição possui capacidade para recebê-lo;
+- como será realizada a coleta;
+- como será realizada a entrega.
+
+A literatura científica também aponta que operações de recuperação e redistribuição de alimentos envolvem desafios logísticos relacionados a diferentes pontos de coleta e entrega, capacidade dos veículos e **janelas de tempo para realização das operações** [5].
+
+A perecibilidade de determinados alimentos torna essa coordenação ainda mais importante.
+
+### Questão central
+
+> **Como facilitar a conexão e a coordenação entre estabelecimentos que possuem alimentos excedentes, instituições que podem aproveitá-los e a logística necessária para que esses alimentos cheguem a um novo destino dentro do período disponível?**
+
+É nesse contexto que surge a **Ravita**.
+
+---
