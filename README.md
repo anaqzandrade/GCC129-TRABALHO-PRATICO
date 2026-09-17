@@ -1,5 +1,7 @@
+![Ravita — conectando excedentes a novos destinos](./docs/images/logo.png)
+
 ### Grupo: CodeSD
-### Integrantes: Ana Cecília Araújo, Gabriel Santos Silva, Lucas Reis Silvino e Luis Felipe Silva Rezende.
+### Integrantes: Ana Cecília Andrade Araújo, Gabriel Santos Silva, Lucas Reis Silvino e Luis Felipe Silva Rezende.
 
 # Ravita
 
@@ -31,17 +33,19 @@ A identidade da Ravita utiliza principalmente:
 
 ## Por que a Ravita existe?
 
+![Por que a Ravita existe?](./docs/images/porque-existe.png)
+
 O desperdício de alimentos representa um problema de grande escala, com consequências sociais, econômicas e ambientais.
 
-Segundo o **Food Waste Index Report 2024**, do Programa das Nações Unidas para o Meio Ambiente (UNEP), aproximadamente **1,05 bilhão de toneladas de alimentos foram desperdiçadas no mundo em 2022**, considerando domicílios, serviços de alimentação e varejo. Esse volume corresponde a aproximadamente **19% dos alimentos disponíveis aos consumidores**.
+Segundo o **Food Waste Index Report 2024**, do Programa das Nações Unidas para o Meio Ambiente (UNEP), aproximadamente **1,05 bilhão de toneladas de alimentos foram desperdiçadas no mundo em 2022**, considerando domicílios, serviços de alimentação e varejo. Esse volume corresponde a aproximadamente **19% dos alimentos disponíveis aos consumidores** [1].
 
-Ao mesmo tempo, o Brasil ainda enfrenta dificuldades relacionadas ao acesso regular e adequado à alimentação. Dados da **PNAD Contínua — Segurança Alimentar 2024**, do Instituto Brasileiro de Geografia e Estatística (IBGE), mostram que **24,2% dos domicílios brasileiros apresentavam algum grau de insegurança alimentar**, correspondendo a aproximadamente 18,9 milhões de domicílios.
+Ao mesmo tempo, o Brasil ainda enfrenta dificuldades relacionadas ao acesso regular e adequado à alimentação. Dados da **PNAD Contínua — Segurança Alimentar 2024**, do Instituto Brasileiro de Geografia e Estatística (IBGE), mostram que **24,2% dos domicílios brasileiros apresentavam algum grau de insegurança alimentar**, correspondendo a aproximadamente 18,9 milhões de domicílios [2].
 
 A existência simultânea desses dois cenários não significa que a redistribuição de alimentos excedentes seja capaz de solucionar, isoladamente, a insegurança alimentar. Entretanto, evidencia a importância de iniciativas capazes de aumentar o aproveitamento de alimentos ainda adequados ao consumo humano.
 
-No Brasil, a redistribuição de alimentos já acontece por meio de diferentes iniciativas. A **Rede Brasileira de Bancos de Alimentos (RBBA)** arrecadou **mais de 72,9 mil toneladas de alimentos em 2024**, demonstrando a existência de um ecossistema real envolvendo doadores, bancos de alimentos, instituições receptoras e beneficiários.
+No Brasil, a redistribuição de alimentos já acontece por meio de diferentes iniciativas. A **Rede Brasileira de Bancos de Alimentos (RBBA)** arrecadou **mais de 72,9 mil toneladas de alimentos em 2024**, demonstrando a existência de um ecossistema real envolvendo doadores, bancos de alimentos, instituições receptoras e beneficiários [3].
 
-A relevância desse processo também é reconhecida pela legislação brasileira. A **Lei nº 15.224, de 30 de setembro de 2025**, instituiu a Política Nacional de Combate à Perda e ao Desperdício de Alimentos (PNCPDA). Entre seus princípios está o incentivo ao uso de soluções, como aplicativos e sites, capazes de aproximar aqueles que desejam doar daqueles que desejam receber alimentos.
+A relevância desse processo também é reconhecida pela legislação brasileira. A **Lei nº 15.224, de 30 de setembro de 2025**, instituiu a Política Nacional de Combate à Perda e ao Desperdício de Alimentos (PNCPDA). Entre seus princípios está o incentivo ao uso de soluções, como aplicativos e sites, capazes de aproximar aqueles que desejam doar daqueles que desejam receber alimentos [4].
 
 ## O problema
 
@@ -82,7 +86,7 @@ A Ravita busca atuar como uma ferramenta de **conexão, organização e acompanh
 
 ## Como a Ravita funciona?
 
-![Como a Ravita funciona](./docs/images/fluxo-ravita.png)
+![Como a Ravita funciona](./docs/images/fluxo.png)
 
 O fluxo inicial da plataforma será:
 
@@ -160,3 +164,160 @@ Pessoas, organizações ou parceiros responsáveis pela retirada e entrega dos a
 Pessoas atendidas pelas instituições que recebem os alimentos redistribuídos.
 
 ---
+
+## Impacto social esperado
+
+O impacto social esperado da Ravita está relacionado principalmente ao **aumento do aproveitamento de alimentos excedentes ainda adequados ao consumo** e ao apoio às instituições que atendem pessoas em situação de vulnerabilidade.
+
+A Ravita não pretende resolver isoladamente problemas amplos como o desperdício de alimentos ou a insegurança alimentar.
+
+Sua contribuição está em atuar sobre uma etapa específica:
+
+**facilitar a conexão e a coordenação entre alimentos disponíveis, instituições interessadas em recebê-los e a logística necessária para realizar a redistribuição.**
+Entre os impactos esperados estão:
+
+- aumento do aproveitamento dos alimentos disponibilizados;
+- redução do tempo necessário para encontrar um novo destino;
+- maior conexão entre estabelecimentos e instituições;
+- melhor organização das retiradas e entregas;
+- geração de dados sobre as redistribuições realizadas;
+- apoio às instituições que atendem pessoas em situação de vulnerabilidade.
+
+---
+
+## Como o impacto será medido?
+
+Entre os indicadores previstos estão:
+
+- quantidade de alimentos disponibilizados;
+- quantidade de alimentos efetivamente redistribuídos;
+- percentual das ofertas aproveitadas;
+- número de estabelecimentos doadores;
+- número de instituições atendidas;
+- número de redistribuições iniciadas;
+- número de redistribuições concluídas;
+- número de redistribuições canceladas;
+- tempo médio entre publicação e reserva;
+- tempo médio entre publicação e retirada;
+- quantidade média de alimentos por redistribuição;
+- estimativa de pessoas atendidas pelas instituições beneficiárias.
+
+### Indicador principal
+
+Um dos principais indicadores será o:
+
+**Percentual de aproveitamento das ofertas**
+
+Ou seja:
+
+> **Dos alimentos disponibilizados na Ravita, quantos efetivamente chegaram a um novo destino?**
+
+O simples número de ofertas cadastradas não demonstra que houve redistribuição. Por isso, a plataforma priorizará indicadores associados às operações efetivamente concluídas.
+
+---
+
+## Quem será beneficiado?
+
+### Instituições sociais e bancos de alimentos
+
+Serão beneficiados diretamente ao terem maior visibilidade sobre alimentos disponíveis e uma forma estruturada de organizar seu recebimento.
+
+### Estabelecimentos doadores
+
+Supermercados, restaurantes, produtores, distribuidores e outros estabelecimentos terão um canal estruturado para disponibilizar seus excedentes e acompanhar sua destinação.
+
+### Pessoas atendidas pelas instituições
+
+São os principais beneficiários indiretos da plataforma.
+
+O aumento da quantidade de alimentos redistribuídos poderá ampliar os recursos disponíveis para as organizações que atendem essas pessoas.
+
+### Responsáveis pela logística
+
+Poderão utilizar informações centralizadas sobre retiradas e entregas que precisam ser realizadas.
+
+
+---
+
+## Limites da solução
+
+A Ravita **não será responsável por determinar se determinado alimento está ou não adequado ao consumo**.
+
+A legislação estabelece condições e responsabilidades relacionadas à doação de alimentos [4].
+
+As responsabilidades sanitárias e o cumprimento das normas aplicáveis continuarão sendo dos participantes envolvidos no processo.
+
+O papel da Ravita será:
+
+**conectar → organizar → acompanhar.**
+
+---
+
+## Disciplina
+
+**GCC129 — Sistemas Distribuídos — 2026/2**
+
+Trabalho Prático: Startup de Sistema Distribuído.
+
+---
+
+## Status do projeto
+
+### Parte 1 — Concepção e Pitch
+
+Nesta etapa estão sendo desenvolvidos:
+
+- identidade da startup;
+- definição do problema;
+- fundamentação por referências;
+- impacto social esperado;
+- proposta inicial da solução;
+- organização do repositório.
+
+---
+
+## Execução
+
+O sistema ainda se encontra na etapa de concepção.
+
+As instruções completas para execução serão adicionadas durante as próximas etapas, conforme o sistema começar a ser implementado.
+
+---
+
+# Referências
+
+**[1] UNEP — UNITED NATIONS ENVIRONMENT PROGRAMME.** *Food Waste Index Report 2024*. Nairobi: United Nations Environment Programme, 2024.
+
+Utilizada para fundamentar a dimensão global do desperdício de alimentos, incluindo a estimativa de aproximadamente 1,05 bilhão de toneladas desperdiçadas em 2022.
+
+---
+
+**[2] IBGE — INSTITUTO BRASILEIRO DE GEOGRAFIA E ESTATÍSTICA.** *Pesquisa Nacional por Amostra de Domicílios Contínua: Segurança Alimentar 2024*. Rio de Janeiro: IBGE, 2025.
+
+Utilizada para contextualizar a situação brasileira de insegurança alimentar, incluindo o percentual de 24,2% dos domicílios em algum grau de insegurança alimentar em 2024.
+
+---
+
+**[3] BRASIL. Ministério do Desenvolvimento e Assistência Social, Família e Combate à Fome — MDS.** *Rede Brasileira de Bancos de Alimentos — RBBA*. Brasília, DF.
+
+Utilizada para demonstrar que a redistribuição de alimentos já ocorre em escala significativa no Brasil e que existe um ecossistema estruturado de bancos de alimentos, doadores, instituições receptoras e beneficiários.
+
+---
+
+**[4] BRASIL.** Lei nº 15.224, de 30 de setembro de 2025. Institui a **Política Nacional de Combate à Perda e ao Desperdício de Alimentos (PNCPDA)**. Brasília, DF, 2025.
+
+Utilizada como fundamentação legal para iniciativas de combate ao desperdício e para o uso de soluções digitais que aproximem potenciais doadores e receptores de alimentos.
+
+---
+
+**[5] DUBEY, Nistha; TANKSALE, Ajinkya.** *A multi-depot vehicle routing problem with time windows, split pickup and split delivery for surplus food recovery and redistribution*. Expert Systems with Applications, 2023. DOI: **10.1016/j.eswa.2023.120807**.
+
+Utilizada para fundamentar os desafios logísticos envolvidos na recuperação e redistribuição de alimentos excedentes, incluindo pontos de coleta e entrega, capacidade de transporte e janelas de tempo.
+
+---
+
+# Ravita
+
+### **Conectando excedentes a novos destinos.**
+
+> **Um alimento que perdeu seu destino comercial não necessariamente perdeu sua capacidade de nutrir.**
