@@ -69,3 +69,94 @@ A perecibilidade de determinados alimentos torna essa coordenação ainda mais i
 É nesse contexto que surge a **Ravita**.
 
 ---
+
+## Nossa proposta
+
+A Ravita será uma plataforma digital que permitirá que estabelecimentos disponibilizem alimentos excedentes e que instituições interessadas encontrem oportunidades compatíveis com suas necessidades.
+
+A proposta não é substituir bancos de alimentos ou iniciativas de redistribuição já existentes.
+
+A Ravita busca atuar como uma ferramenta de **conexão, organização e acompanhamento** desse processo.
+
+---
+
+## Como a Ravita funciona?
+
+![Como a Ravita funciona](./docs/images/fluxo-ravita.png)
+
+O fluxo inicial da plataforma será:
+
+### 1. Doador cadastra o excedente
+
+Um supermercado, restaurante, produtor, distribuidor ou outro estabelecimento registra os alimentos disponíveis.
+
+Entre as informações poderão estar:
+
+- tipo de alimento;
+- quantidade;
+- localização;
+- período disponível para retirada;
+- informações necessárias para o recebimento.
+
+### 2. Instituição identifica uma oferta
+
+Instituições cadastradas poderão consultar os alimentos disponíveis e identificar ofertas compatíveis com suas necessidades.
+
+### 3. Reserva do alimento
+
+Quando uma instituição demonstrar interesse em determinada oferta, os alimentos poderão ser reservados.
+
+A reserva evita que a mesma quantidade seja destinada simultaneamente a diferentes instituições.
+
+### 4. Coleta e entrega
+
+Após a reserva, será organizada a retirada dos alimentos e sua entrega à instituição beneficiária.
+
+### 5. Redistribuição concluída
+
+Quando os alimentos chegarem ao destino, a entrega será confirmada.
+
+Dessa maneira, a plataforma consegue diferenciar:
+
+**alimento disponibilizado**
+
+de
+
+**alimento efetivamente redistribuído.**
+
+### Fluxo resumido
+
+**Alimento disponível → instituição interessada → reserva → coleta → entrega → redistribuição concluída**
+
+---
+
+## Participantes
+
+### Estabelecimentos doadores
+
+Podem incluir:
+
+- supermercados;
+- restaurantes;
+- produtores;
+- distribuidores;
+- outros estabelecimentos que possuam alimentos excedentes adequados à redistribuição.
+
+### Instituições beneficiárias
+
+Podem incluir:
+
+- bancos de alimentos;
+- organizações sociais;
+- associações;
+- outras instituições aptas a receber os alimentos.
+
+### Responsáveis pela logística
+
+Pessoas, organizações ou parceiros responsáveis pela retirada e entrega dos alimentos.
+
+### Beneficiários indiretos
+
+Pessoas atendidas pelas instituições que recebem os alimentos redistribuídos.
+
+---
