@@ -1,12 +1,4 @@
-# Ravita — Parte 2
 ## 01. Arquitetura e Decomposição em Microsserviços
-
-**Responsável pelo commit:** Integrante 1  
-**Branch sugerida:** `docs/parte2-arquitetura`  
-**Status:** proposta arquitetural para revisão do grupo
-
----
-
 ## 1. Objetivo
 
 Este documento define a arquitetura geral da Ravita e as fronteiras dos microsserviços de domínio.
