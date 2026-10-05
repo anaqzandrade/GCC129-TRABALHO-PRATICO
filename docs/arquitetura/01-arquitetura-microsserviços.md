@@ -267,3 +267,83 @@ CANCELLED
 | Logistics | Como o alimento chega ao destino? |
 
 A decomposição busca manter responsabilidades claras sem transformar funcionalidades pequenas em serviços independentes sem necessidade.
+
+---
+
+## 9. Comunicação entre os serviços
+
+### Síncrona — REST
+
+Utilizada quando o solicitante precisa de resposta imediata.
+
+Exemplos:
+
+- validar organização;
+- reservar oferta;
+- consultar operação logística.
+
+### Assíncrona — RabbitMQ
+
+Utilizada para eventos de domínio.
+
+Eventos previstos:
+
+- `OfferCreated`;
+- `OfferReserved`;
+- `OfferReleased`;
+- `OfferExpired`;
+- `RedistributionCreated`;
+- `RedistributionCancelled`;
+- `RedistributionCompleted`;
+- `PickupScheduled`;
+- `FoodCollected`;
+- `FoodDelivered`.
+
+---
+
+## 10. Decisões arquiteturais iniciais
+
+### PostgreSQL por serviço
+
+Será utilizada uma instância/container PostgreSQL independente por microsserviço para reduzir complexidade operacional e preservar propriedade exclusiva do dado.
+
+### RabbitMQ
+
+Escolhido como proposta de broker por oferecer:
+
+- filas e exchanges simples;
+- retries;
+- dead-letter queues;
+- boa integração com Docker e Kubernetes;
+- complexidade adequada ao escopo acadêmico.
+
+### SAGA
+
+SAGA **orquestrada** pelo Redistribution Service.
+
+### CQRS
+
+Aplicado no Offer Service.
+
+### Transactional Outbox
+
+Aplicado inicialmente no Offer Service.
+
+---
+
+## 11. Resumo
+
+A arquitetura proposta possui cinco microsserviços de domínio, banco independente por serviço, comunicação REST para interações síncronas e RabbitMQ para eventos.
+
+Os demais documentos detalham API/Gateway/BFF, dados/Outbox/CQRS e SAGA.
+
+---
+
+## Checklist antes do commit
+
+- [ ] O grupo revisou os cinco microsserviços.
+- [ ] As fronteiras foram aprovadas.
+- [ ] PostgreSQL por serviço foi aprovado.
+- [ ] RabbitMQ foi aprovado.
+- [ ] SAGA orquestrada foi aprovada.
+- [ ] O diagrama Mermaid renderiza corretamente no GitHub.
