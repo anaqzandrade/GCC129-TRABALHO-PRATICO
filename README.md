@@ -278,6 +278,13 @@ Nesta etapa estão sendo desenvolvidos:
 
 ## Execução
 
+### Documentação de arquitetura
+
+- [01. Arquitetura e decomposição em microsserviços](./docs/arquitetura/01-arquitetura-microsserviços.md)
+- [02. API REST, versionamento, HATEOAS, API Gateway e BFFs](./docs/arquitetura/02-rest-gateway-bff.md)
+
+### Implementação
+
 O sistema ainda se encontra na etapa de concepção.
 
 As instruções completas para execução serão adicionadas durante as próximas etapas, conforme o sistema começar a ser implementado.
