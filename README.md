@@ -282,6 +282,7 @@ Nesta etapa estão sendo desenvolvidos:
 
 - [01. Arquitetura e decomposição em microsserviços](./docs/arquitetura/01-arquitetura-microsserviços.md)
 - [02. API REST, versionamento, HATEOAS, API Gateway e BFFs](./docs/arquitetura/02-rest-gateway-bff.md)
+- [Catálogo de contratos REST dos serviços e BFFs](./docs/arquitetura/02-contratos-rest.md)
 
 ### Implementação
 

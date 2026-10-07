@@ -3,6 +3,8 @@
 
 Documento complementar à [arquitetura de microsserviços](./01-arquitetura-microsserviços.md).
 
+O [catálogo completo de contratos REST](./02-contratos-rest.md) detalha campos, validações, cabeçalhos, respostas e permissões de cada endpoint. Este documento apresenta decisões e exemplos resumidos; o catálogo complementa os exemplos com todos os campos obrigatórios e é a referência para os formatos de entrada e saída.
+
 ---
 
 ## 1. Objetivo
@@ -396,12 +398,12 @@ flowchart LR
 
 | Rota externa | Destino |
 |---|---|
-| `/portal/**` | Portal BFF |
-| `/admin/**` | Admin BFF |
+| `/portal/v1/**` | Portal BFF |
+| `/admin/v1/**` | Admin BFF |
 
 Os serviços de domínio ficarão em rede interna.
 
-Os BFFs também ficam na rede interna, acessíveis externamente somente pelo Gateway. As rotas `/api/v1/**` não são publicadas diretamente. O Gateway valida a identidade e o acesso à rota; os serviços verificam a autorização sobre cada recurso, como a propriedade de uma oferta. Identificadores enviados pelo cliente não comprovam sua identidade. Rotas administrativas exigem perfil administrativo; chamadas internas de reserva e compensação exigem identidade de serviço autorizada.
+Os BFFs também ficam na rede interna, acessíveis externamente somente pelo Gateway. As rotas `/api/v1/**` não são publicadas diretamente. O Gateway valida a identidade e o acesso à rota; os serviços verificam a autorização sobre cada recurso, como a propriedade de uma oferta. Identificadores enviados pelo cliente não comprovam sua identidade. Consultas administrativas exigem perfil administrativo; a área logística do mesmo painel exige permissões específicas e atribuição à operação, conforme o catálogo. Chamadas internas de reserva e compensação exigem identidade de serviço autorizada.
 
 ---
 
@@ -544,8 +546,8 @@ Esta seção registra decisões de projeto propostas pelo Integrante 2, a pedido
 | Doador ativo | Criar ofertas, consultar suas operações e editar ou cancelar suas ofertas disponíveis |
 | Instituição ativa | Consultar ofertas, criar e consultar suas demandas, consultar seus matches e solicitar redistribuição |
 | Participante de uma redistribuição | Consultar seu acompanhamento e solicitar cancelamento antes da coleta |
-| Administrador | Consultar organizações, indicadores e diagnósticos operacionais; o perfil não concede permissão automática para alterar estados de negócio |
-| Operador logístico autorizado | Registrar coleta e entrega das operações que lhe foram atribuídas, por contrato interno; a interface desse operador não é um terceiro cliente exigido nesta proposta |
+| Administrador | Consultar organizações, indicadores e diagnósticos; permissões adicionais explícitas permitem gerenciar cadastros e agendar operações, sem forçar estados de negócio |
+| Operador logístico autorizado | Registrar os marcos das operações atribuídas, pela área restrita do painel administrativo e contratos internos; utiliza o mesmo cliente Admin, com permissões distintas |
 | Redistribution Service | Solicitar reserva, liberação e criação/cancelamento logístico como parte da SAGA |
 
 A autenticação identifica usuário, organização e permissões. O Gateway valida o acesso à rota; cada serviço valida a ação e a relação do usuário com o recurso. Uma identidade de serviço não elimina a necessidade de preservar e validar o contexto do usuário em operações delegadas. Cabeçalhos de identidade enviados pelo cliente não são confiáveis.
@@ -574,7 +576,7 @@ Cancelamento direto de oferta disponível usa `POST /api/v1/offers/{offerId}/can
 
 O Offer deve conferir disponibilidade e registrar a reserva na mesma transação local, com atualização condicional ou bloqueio e restrição que impeça mais de uma reserva ativa por oferta. Duas redistribuições podem ser aceitas para processamento, mas somente uma pode obter a reserva; a outra termina com falha de negócio registrada pelo orquestrador.
 
-Edições e cancelamentos diretos usam a versão atual do recurso: a consulta retorna `ETag`, e o comando envia `If-Match`. Ausência da precondição retorna `428`; versão desatualizada retorna `412`. O BFF preserva esses cabeçalhos. A verificação de versão e a alteração são atômicas, impedindo que uma edição sobrescreva uma reserva concorrente.
+Edições e cancelamentos diretos usam a versão atual do recurso: a consulta interna retorna `ETag`, e o comando envia `If-Match`. Ausência da precondição retorna `428`; versão desatualizada retorna `412`. Quando o BFF transforma a representação, expõe a versão de escrita como `editVersion`, em vez de reutilizar o ETag de outro JSON; detalhes constam no catálogo. A verificação de versão e a alteração são atômicas, impedindo que uma edição sobrescreva uma reserva concorrente.
 
 ### 15.4 Repetição de comandos e timeout
 
@@ -640,7 +642,7 @@ O fluxo proposto é `cliente → Gateway → BFF → serviço`. Gateway aplica a
 
 Não repetir automaticamente comandos sem idempotência. Timeouts e limites devem ser configuráveis; valores operacionais serão medidos na implementação. Um BFF retorna erro se faltar uma dependência essencial, sem substituir falhas por totais zero. Dados opcionais ausentes devem ser identificados explicitamente, nunca apresentados como se a operação não existisse.
 
-Listagens têm ordenação estável com desempate por identificador. Totais do dashboard vêm de consultas agregadas dos serviços ou de projeções apropriadas, não da contagem da página visível. A definição dos endpoints de agregação pertence à revisão dos contratos completos. Indicadores de quantidade não misturam `KG`, `L` e unidades individuais.
+Listagens têm ordenação estável com desempate por identificador. Totais do dashboard vêm das consultas `statistics` dos serviços definidas no catálogo, não da contagem da página visível. Cada total inclui o instante de referência; não se promete um snapshot distribuído único. Indicadores de quantidade não misturam `KG`, `L` e unidades individuais.
 
 ### 15.9 Cenários de aceitação para a implementação futura
 
@@ -675,4 +677,4 @@ Estas decisões reduzem ambiguidades e riscos conhecidos; não garantem ausênci
 - [x] Gateway sem regra de negócio e como única entrada externa.
 - [x] Portal BFF e Admin BFF com necessidades e respostas distintas.
 - [ ] Revisão e aprovação dos contratos pelo grupo.
-- [ ] Completar schemas de entrada/saída e respostas por endpoint antes da entrega final da Parte 2.
+- [x] Campos de entrada/saída, cabeçalhos, permissões e respostas por endpoint detalhados no catálogo complementar.
