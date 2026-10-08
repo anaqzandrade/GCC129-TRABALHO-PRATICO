@@ -31,15 +31,19 @@ Também existirão:
 
 ```mermaid
 flowchart TB
-    WEB[Portal Ravita] --> PBFF[Portal BFF]
-    ADMIN[Painel Administrativo] --> ABFF[Admin BFF]
-    PBFF --> GW[API Gateway]
-    ABFF --> GW
-    GW --> ORG[Organization Service]
-    GW --> OFF[Offer Service]
-    GW --> MAT[Demand / Matching Service]
-    GW --> RED[Redistribution Service]
-    GW --> LOG[Logistics Service]
+    WEB[Portal Ravita] --> GW[API Gateway]
+    ADMIN[Painel Administrativo] --> GW
+    GW -->|/portal/v1| PBFF[Portal BFF]
+    GW -->|/admin/v1| ABFF[Admin BFF]
+    PBFF --> ORG[Organization Service]
+    PBFF --> OFF[Offer Service]
+    PBFF --> MAT[Demand / Matching Service]
+    PBFF --> RED[Redistribution Service]
+    PBFF --> LOG[Logistics Service]
+    ABFF --> ORG
+    ABFF --> OFF
+    ABFF --> RED
+    ABFF --> LOG
     ORG --> ORGDB[(organization_db)]
     OFF --> OFFDB[(offer_db)]
     MAT --> MATDB[(matching_db)]
