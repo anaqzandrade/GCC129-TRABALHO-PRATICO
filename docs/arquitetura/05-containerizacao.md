@@ -199,14 +199,15 @@ Todos os containers usam `restart: unless-stopped`.
 O offer-service pode ser escalado horizontalmente:
 
 ```bash
-docker compose up -d --scale offer-service=3
+docker compose -f docker-compose.yml -f docker-compose.scale.yml up -d --scale offer-service=3
 ```
 
 - O serviço não guarda estado em memória: tudo está no `offer_db`, compartilhado pelas réplicas.
 - Reservas concorrentes em réplicas diferentes continuam corretas: a `Offer` tem controle otimista de versão (`@Version`), e só uma reserva grava (ver doc 04, seção 15).
 - O job de expiração roda em todas as réplicas, mas o UPDATE é idempotente.
-- A porta publicada é uma faixa (`8082-8085:8082`): cada réplica recebe uma porta livre da faixa.
-- Na rede `services`, o nome `offer-service` passa a resolver para todas as réplicas. A JVM guarda a resolução de DNS em cache (30 segundos, por padrão), então chamadas seguidas de um mesmo serviço podem ir para a mesma réplica.
+- Duas réplicas não podem publicar a mesma porta no host. O `docker-compose.scale.yml` remove a porta publicada do offer-service (`ports: !reset []`), e as réplicas passam a ser acessadas apenas pela rede `services`.
+- Na rede `services`, o nome `offer-service` passa a resolver para todas as réplicas. Cada requisição gera uma linha de log com método, caminho, status e correlation id, prefixada pelo nome da réplica (`offer-service-1`, `-2`, `-3`) no `docker compose logs`.
+- A JVM guarda a resolução de DNS em cache (30 segundos, por padrão), então chamadas seguidas de um mesmo serviço Java podem ir para a mesma réplica. Na demonstração, as requisições saem de processos `wget` separados, que resolvem o nome a cada execução.
 
 ---
 

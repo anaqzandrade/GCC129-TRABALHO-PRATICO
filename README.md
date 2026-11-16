@@ -281,7 +281,7 @@ Nesta etapa estão sendo desenvolvidos:
 ### Pré-requisitos
 
 - Docker com Docker Compose v2 (no Windows e no macOS, o Docker Desktop já inclui os dois).
-- Portas livres no host: 8080 a 8085 e 15672.
+- Portas livres no host: 8080 a 8084 e 15672.
 - Não é preciso ter Java nem Maven instalados: cada serviço é compilado dentro do próprio container.
 
 ### Subir o sistema
@@ -321,13 +321,20 @@ curl http://localhost:8080/api/v1/demands
 
 ### Escalar o offer-service
 
-```bash
-docker compose up -d --scale offer-service=3
-docker compose ps offer-service                     # 3 réplicas, cada uma numa porta entre 8082 e 8085
-docker compose logs -f offer-service                # linhas de offer-service-1, -2 e -3
-```
+Várias réplicas não podem publicar a mesma porta no host. Por isso a escala usa o arquivo
+`docker-compose.scale.yml`, que tira a porta publicada do offer-service. As réplicas continuam
+acessíveis pelos outros serviços na rede `services`, onde o nome `offer-service` resolve para todas elas.
 
-Dentro da rede `services`, o nome `offer-service` passa a resolver para as três réplicas.
+```bash
+docker compose -f docker-compose.yml -f docker-compose.scale.yml up -d --scale offer-service=3
+docker compose ps offer-service                     # 3 réplicas: offer-service-1, -2 e -3
+
+# requisições de dentro da rede, a partir de outro serviço
+docker compose exec redistribution-service sh -c "for i in 1 2 3 4 5 6 7 8 9; do wget -qO- http://offer-service:8082/api/v1/offers > /dev/null; done"
+docker compose logs offer-service                   # cada linha "GET /api/v1/offers" mostra qual réplica atendeu
+
+docker compose up -d                                # volta a uma réplica, com a porta 8082 publicada
+```
 
 ### Parar
 
