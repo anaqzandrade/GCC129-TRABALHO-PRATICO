@@ -1,0 +1,264 @@
+# Ravita — sistema completo com um único comando.
+#
+#   Subir:         docker compose up --build
+#   Parar:         docker compose down       (mantém os dados nos volumes)
+#   Apagar dados:  docker compose down -v
+#
+# Redes:
+#   services           serviços de domínio + RabbitMQ (comunicação entre serviços)
+#   <serviço>-data     rede interna de cada banco: só o próprio serviço enxerga o seu banco
+#
+# Os bancos não publicam porta no host. As portas dos serviços estão publicadas para testes
+# enquanto o API Gateway não existe (Parte 4); depois, só o gateway ficará exposto.
+# Usuários e senhas têm valores padrão; para trocar, copie .env.example para .env.
+name: ravita
+
+x-postgres: &postgres
+  image: postgres:17-alpine
+  restart: unless-stopped
+  healthcheck:
+    test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+    interval: 5s
+    timeout: 3s
+    retries: 10
+
+x-db-credentials: &db-credentials
+  POSTGRES_USER: ${POSTGRES_USER:-ravita}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ravita}
+
+# padrão de variáveis do redistribution e do logistics
+x-rabbit-env: &rabbit-env
+  RABBITMQ_HOST: rabbitmq
+  RABBITMQ_PORT: 5672
+  RABBITMQ_USER: ${RABBITMQ_USER:-ravita}
+  RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-ravita}
+  RABBITMQ_EXCHANGE: ravita.events
+
+services:
+
+  # ---------------------------------------------------------------- mensageria
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    # nome fixo: o RabbitMQ guarda os dados pelo nome do nó, que vem do hostname
+    hostname: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-ravita}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-ravita}
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - services
+    ports:
+      - "15672:15672"   # painel de administração
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------- organization
+  organization-db:
+    <<: *postgres
+    environment:
+      <<: *db-credentials
+      POSTGRES_DB: organization_db
+    volumes:
+      - organization-db-data:/var/lib/postgresql/data
+    networks:
+      - organization-data
+
+  organization-service:
+    build: ./organization-service
+    image: ravita/organization-service:0.0.1
+    environment:
+      SERVER_PORT: 8081
+      DATABASE_URL: jdbc:postgresql://organization-db:5432/organization_db
+      DATABASE_USERNAME: ${POSTGRES_USER:-ravita}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-ravita}
+    depends_on:
+      organization-db:
+        condition: service_healthy
+    networks:
+      - services
+      - organization-data
+    ports:
+      - "8081:8081"
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------- offer
+  offer-db:
+    <<: *postgres
+    environment:
+      <<: *db-credentials
+      POSTGRES_DB: offer_db
+    volumes:
+      - offer-db-data:/var/lib/postgresql/data
+    networks:
+      - offer-data
+
+  offer-service:
+    build: ./offer-service
+    image: ravita/offer-service:0.0.1
+    environment:
+      SERVER_PORT: 8082
+      DB_HOST: offer-db
+      DB_PORT: 5432
+      DB_NAME: offer_db
+      DB_USER: ${POSTGRES_USER:-ravita}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-ravita}
+      ORGANIZATION_SERVICE_URL: http://organization-service:8081
+    depends_on:
+      offer-db:
+        condition: service_healthy
+      organization-service:
+        condition: service_started
+    networks:
+      - services
+      - offer-data
+    ports:
+      # faixa de portas: permite "docker compose up --scale offer-service=3"
+      # (cada réplica recebe uma porta livre da faixa; com uma réplica, normalmente a 8082)
+      - "8082-8085:8082"
+    healthcheck:
+      # /actuator/health inclui o banco: só fica healthy se o PostgreSQL responder
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8082/actuator/health > /dev/null || exit 1"]
+      interval: 10s
+      timeout: 3s
+      start_period: 40s
+      retries: 5
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------- demand/matching
+  matching-db:
+    <<: *postgres
+    environment:
+      <<: *db-credentials
+      POSTGRES_DB: matching_db
+    volumes:
+      - matching-db-data:/var/lib/postgresql/data
+    networks:
+      - matching-data
+
+  demand-matching-service:
+    build: ./demand-matching-service
+    image: ravita/demand-matching-service:0.0.1
+    # o application.yml deste serviço tem valores fixos; as variáveis SPRING_* abaixo
+    # têm precedência sobre ele, então não é preciso alterar o código
+    environment:
+      SERVER_PORT: 8080
+      SPRING_DATASOURCE_URL: jdbc:postgresql://matching-db:5432/matching_db
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-ravita}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-ravita}
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER:-ravita}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-ravita}
+    depends_on:
+      matching-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - services
+      - matching-data
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------- logistics
+  logistics-db:
+    <<: *postgres
+    environment:
+      <<: *db-credentials
+      POSTGRES_DB: logistics_db
+    volumes:
+      - logistics-db-data:/var/lib/postgresql/data
+    networks:
+      - logistics-data
+
+  logistics-service:
+    build: ./logistics-service
+    image: ravita/logistics-service:0.0.1
+    environment:
+      <<: *rabbit-env
+      SERVER_PORT: 8084
+      DB_HOST: logistics-db
+      DB_PORT: 5432
+      DB_NAME: logistics_db
+      DB_USER: ${POSTGRES_USER:-ravita}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-ravita}
+    depends_on:
+      logistics-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - services
+      - logistics-data
+    ports:
+      - "8084:8084"
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------- redistribution (orquestrador da SAGA)
+  redistribution-db:
+    <<: *postgres
+    environment:
+      <<: *db-credentials
+      POSTGRES_DB: redistribution_db
+    volumes:
+      - redistribution-db-data:/var/lib/postgresql/data
+    networks:
+      - redistribution-data
+
+  redistribution-service:
+    build: ./redistribution-service
+    image: ravita/redistribution-service:0.0.1
+    environment:
+      <<: *rabbit-env
+      SERVER_PORT: 8083
+      DB_HOST: redistribution-db
+      DB_PORT: 5432
+      DB_NAME: redistribution_db
+      DB_USER: ${POSTGRES_USER:-ravita}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-ravita}
+      OFFER_SERVICE_URL: http://offer-service:8082
+      LOGISTICS_SERVICE_URL: http://logistics-service:8084
+    depends_on:
+      redistribution-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      offer-service:
+        condition: service_started
+      logistics-service:
+        condition: service_started
+    networks:
+      - services
+      - redistribution-data
+    ports:
+      - "8083:8083"
+    restart: unless-stopped
+
+networks:
+  services:
+  # internal: sem acesso de fora da rede; cada banco só é alcançável pelo próprio serviço
+  organization-data:
+    internal: true
+  offer-data:
+    internal: true
+  matching-data:
+    internal: true
+  logistics-data:
+    internal: true
+  redistribution-data:
+    internal: true
+
+volumes:
+  rabbitmq-data:
+  organization-db-data:
+  offer-db-data:
+  matching-db-data:
+  logistics-db-data:
+  redistribution-db-data:
