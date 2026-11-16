@@ -1,0 +1,53 @@
+# Toda configuração vem de variáveis de ambiente (padrão de nomes do redistribution/logistics).
+# Os valores depois de ":" são apenas para rodar localmente sem Docker.
+server:
+  port: ${SERVER_PORT:8082}
+  shutdown: graceful
+
+spring:
+  application:
+    name: offer-service
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:offer_db}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:postgres}
+  jpa:
+    # O schema pertence ao Flyway (src/main/resources/db/migration); o Hibernate não altera tabelas.
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+  flyway:
+    enabled: true
+  jackson:
+    # Contrato: campos desconhecidos na entrada retornam 400.
+    deserialization:
+      fail-on-unknown-properties: true
+    # Contrato: campos opcionais ausentes são omitidos da resposta.
+    default-property-inclusion: non_null
+    # 30.000 sai como 30, e não como 3E+1.
+    generator:
+      write-bigdecimal-as-plain: true
+
+ravita:
+  # Fuso usado para escrever datas nas respostas (a persistência é sempre em UTC).
+  time-zone: ${RAVITA_TIME_ZONE:America/Sao_Paulo}
+  services:
+    organization-url: ${ORGANIZATION_SERVICE_URL:http://localhost:8081}
+    organization-timeout: ${ORGANIZATION_SERVICE_TIMEOUT:2s}
+  expiration:
+    # Intervalo (ms) do job que marca ofertas vencidas como EXPIRED.
+    interval-ms: ${OFFER_EXPIRATION_INTERVAL_MS:60000}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  pattern:
+    level: "%5p [%X{correlationId:-}]"

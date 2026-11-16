@@ -1,0 +1,20 @@
+# Perfil de teste: H2 em memória, para `mvn test` rodar sem PostgreSQL nem Docker.
+# O schema de verdade (Flyway) é exercitado quando o serviço sobe com o PostgreSQL.
+spring:
+  datasource:
+    url: jdbc:h2:mem:offer_db;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+  flyway:
+    enabled: false
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+
+ravita:
+  services:
+    organization-url: http://organization-service.test
+  expiration:
+    # o job não roda durante os testes; eles chamam expireOverdue() quando precisam
+    interval-ms: 3600000
