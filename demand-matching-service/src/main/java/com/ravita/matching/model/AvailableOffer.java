@@ -1,4 +1,4 @@
-package main.java.com.ravita.matching.model;
+package com.ravita.matching.model;
 
 import jakarta.persistence.*;
 import lombok.Data;
@@ -29,8 +29,4 @@ public class AvailableOffer {
     private OfferStatus status;
     
     private OffsetDateTime availableUntil;
-}
-
-enum OfferStatus {
-    AVAILABLE, RESERVED, COLLECTED, COMPLETED, CANCELLED, EXPIRED
 }

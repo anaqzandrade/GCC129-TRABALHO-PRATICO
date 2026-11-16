@@ -1,4 +1,4 @@
-package main.java.com.ravita.matching.model;
+package com.ravita.matching.model;
 
 import jakarta.persistence.*;
 import lombok.Data;

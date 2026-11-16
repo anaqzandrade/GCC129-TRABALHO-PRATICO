@@ -1,5 +1,7 @@
-package main.java.com.ravita.matching.controller;
+package com.ravita.matching.controller;
 
+import com.ravita.matching.dto.DemandInput;
+import com.ravita.matching.dto.MatchesResponse;
 import com.ravita.matching.model.Demand;
 import com.ravita.matching.service.DemandService;
 import org.springframework.beans.factory.annotation.Autowired;

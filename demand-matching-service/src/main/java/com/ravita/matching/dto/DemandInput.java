@@ -1,4 +1,4 @@
-package main.java.com.ravita.matching.dto;
+package com.ravita.matching.dto;
 
 import com.ravita.matching.model.FoodCategory;
 import com.ravita.matching.model.Unit;

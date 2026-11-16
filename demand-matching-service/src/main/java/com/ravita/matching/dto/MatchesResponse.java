@@ -1,4 +1,4 @@
-package main.java.com.ravita.matching.dto;
+package com.ravita.matching.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

@@ -1,4 +1,4 @@
-package main.java.com.ravita.matching.service;
+package com.ravita.matching.service;
 
 import com.ravita.matching.dto.DemandInput;
 import com.ravita.matching.dto.MatchDto;

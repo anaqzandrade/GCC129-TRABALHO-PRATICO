@@ -1,4 +1,4 @@
-package main.java.com.ravita.matching.repository;
+package com.ravita.matching.repository;
 
 import com.ravita.matching.model.AvailableOffer;
 import com.ravita.matching.model.FoodCategory;
