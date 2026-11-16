@@ -1,0 +1,9 @@
+package com.ravita.organization.domain;
+import jakarta.persistence.*; import java.time.OffsetDateTime; import java.util.*;
+@Entity @Table(name="organizations",uniqueConstraints=@UniqueConstraint(name="uk_organization_document",columnNames="document")) public class Organization {
+ @Id private String id; @Column(nullable=false,length=150) private String name; @Enumerated(EnumType.STRING) @Column(nullable=false) private OrganizationType type; @Column(nullable=false,length=14) private String document; @Embedded private Address address; @ElementCollection private List<ReceivingCapacity> receivingCapacity=new ArrayList<>(); @Column(nullable=false) private boolean active=true; @Column(nullable=false,updatable=false) private OffsetDateTime createdAt; @Column(nullable=false) private OffsetDateTime updatedAt;
+ protected Organization(){} public Organization(String name,OrganizationType type,String document,Address address,List<ReceivingCapacity> receivingCapacity){this.id="org-"+UUID.randomUUID();this.name=name;this.type=type;this.document=document;this.address=address;this.receivingCapacity=receivingCapacity==null?new ArrayList<>():new ArrayList<>(receivingCapacity);}
+ @PrePersist void create(){createdAt=OffsetDateTime.now();updatedAt=createdAt;} @PreUpdate void updateTime(){updatedAt=OffsetDateTime.now();}
+ public String getId(){return id;} public String getName(){return name;} public OrganizationType getType(){return type;} public String getDocument(){return document;} public Address getAddress(){return address;} public List<ReceivingCapacity> getReceivingCapacity(){return receivingCapacity;} public boolean isActive(){return active;} public OffsetDateTime getCreatedAt(){return createdAt;} public OffsetDateTime getUpdatedAt(){return updatedAt;}
+ public void patch(String name, Address address, Boolean active){if(name!=null)this.name=name;if(address!=null)this.address=address;if(active!=null)this.active=active;}
+}
