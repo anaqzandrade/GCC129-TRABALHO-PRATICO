@@ -343,6 +343,7 @@ docker compose down -v     # remove também os volumes: apaga os dados de todos 
 - [Catálogo de contratos REST dos serviços e BFFs](./docs/arquitetura/02-contratos-rest.md)
 - [03. Database per Service, Consistência Eventual, Dual Write, Outbox e CQRS](./docs/arquitetura/03-dados-outbox-cqrs.md)
 - [04. SAGA de Redistribuição](./docs/arquitetura/04-saga-redistribuicao.md)
+- [05. Containerização com Docker e Docker Compose](./docs/arquitetura/05-containerizacao.md)
 
 ### Implementação
 
