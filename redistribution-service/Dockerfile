@@ -6,7 +6,10 @@ COPY src ./src
 RUN mvn clean package -DskipTests
 
 FROM eclipse-temurin:21-jre-alpine
+# a aplicação não roda como root dentro do container
+RUN addgroup -S ravita && adduser -S ravita -G ravita
 WORKDIR /app
-COPY --from=builder /app/target/*.jar app.jar
+COPY --from=builder --chown=ravita:ravita /app/target/*.jar app.jar
+USER ravita
 EXPOSE 8083
 ENTRYPOINT ["java", "-jar", "app.jar"]
