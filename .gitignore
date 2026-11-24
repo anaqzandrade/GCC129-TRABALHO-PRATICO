@@ -1,1 +1,4 @@
-organization-service/target/
+target/
+.vscode/
+.idea/
+.env
