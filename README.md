@@ -396,3 +396,6 @@ Utilizada para fundamentar os desafios logísticos envolvidos na recuperação e
 ### **Conectando excedentes a novos destinos.**
 
 > **Um alimento que perdeu seu destino comercial não necessariamente perdeu sua capacidade de nutrir.**
+
+
+**Link para o video de demonstração Docker - Parte 3:** https://youtu.be/QFMCmb3SMFI
