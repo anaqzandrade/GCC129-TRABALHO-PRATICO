@@ -278,6 +278,71 @@ Nesta etapa estão sendo desenvolvidos:
 
 ## Execução
 
+### Pré-requisitos
+
+- Docker com Docker Compose v2 (no Windows e no macOS, o Docker Desktop já inclui os dois).
+- Portas livres no host: 8080 a 8084 e 15672.
+- Não é preciso ter Java nem Maven instalados: cada serviço é compilado dentro do próprio container.
+
+### Subir o sistema
+
+```bash
+git clone https://github.com/anaqzandrade/GCC129-TRABALHO-PRATICO.git
+cd GCC129-TRABALHO-PRATICO
+docker compose up --build
+```
+
+O primeiro build baixa as dependências Maven de cada serviço e pode levar alguns minutos; os seguintes reaproveitam o cache.
+Usuários e senhas têm valores padrão. Para trocá-los, copie `.env.example` para `.env` antes de subir.
+
+### Componentes e portas
+
+| Componente | Endereço no host | Banco próprio |
+|---|---|---|
+| demand-matching-service | http://localhost:8080 | `matching_db` |
+| organization-service | http://localhost:8081 | `organization_db` |
+| offer-service | http://localhost:8082 | `offer_db` |
+| redistribution-service | http://localhost:8083 | `redistribution_db` |
+| logistics-service | http://localhost:8084 | `logistics_db` |
+| RabbitMQ (painel) | http://localhost:15672 (usuário `ravita`, senha `ravita`) | — |
+
+Cada serviço tem uma instância própria de PostgreSQL, numa rede interna que só ele acessa. Os bancos não são publicados no host.
+As portas dos serviços ficam publicadas para testes enquanto o API Gateway não existe; na Parte 4, só o gateway será exposto.
+
+### Verificar
+
+```bash
+docker compose ps                                   # todos os containers "running"; bancos, RabbitMQ e offer-service "healthy"
+curl http://localhost:8082/actuator/health          # {"status":"UP"}
+curl http://localhost:8081/api/v1/organizations
+curl http://localhost:8082/api/v1/offers
+curl http://localhost:8080/api/v1/demands
+```
+
+### Escalar o offer-service
+
+Várias réplicas não podem publicar a mesma porta no host. Por isso a escala usa o arquivo
+`docker-compose.scale.yml`, que tira a porta publicada do offer-service. As réplicas continuam
+acessíveis pelos outros serviços na rede `services`, onde o nome `offer-service` resolve para todas elas.
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.scale.yml up -d --scale offer-service=3
+docker compose ps offer-service                     # 3 réplicas: offer-service-1, -2 e -3
+
+# requisições de dentro da rede, a partir de outro serviço
+docker compose exec redistribution-service sh -c "for i in 1 2 3 4 5 6 7 8 9; do wget -qO- http://offer-service:8082/api/v1/offers > /dev/null; done"
+docker compose logs offer-service                   # cada linha "GET /api/v1/offers" mostra qual réplica atendeu
+
+docker compose up -d                                # volta a uma réplica, com a porta 8082 publicada
+```
+
+### Parar
+
+```bash
+docker compose down        # remove os containers e mantém os dados (volumes)
+docker compose down -v     # remove também os volumes: apaga os dados de todos os bancos
+```
+
 ### Documentação de arquitetura
 
 - [01. Arquitetura e decomposição em microsserviços](./docs/arquitetura/01-arquitetura-microsserviços.md)
@@ -285,12 +350,12 @@ Nesta etapa estão sendo desenvolvidos:
 - [Catálogo de contratos REST dos serviços e BFFs](./docs/arquitetura/02-contratos-rest.md)
 - [03. Database per Service, Consistência Eventual, Dual Write, Outbox e CQRS](./docs/arquitetura/03-dados-outbox-cqrs.md)
 - [04. SAGA de Redistribuição](./docs/arquitetura/04-saga-redistribuicao.md)
+- [05. Containerização com Docker e Docker Compose](./docs/arquitetura/05-containerizacao.md)
 
 ### Implementação
 
-O sistema ainda se encontra na etapa de concepção.
-
-As instruções completas para execução serão adicionadas durante as próximas etapas, conforme o sistema começar a ser implementado.
+Os cinco serviços de domínio estão implementados e containerizados, cada um com o próprio Dockerfile e banco de dados.
+O API Gateway, os BFFs e a integração com LLM fazem parte da Parte 4.
 
 ---
 
