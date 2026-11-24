@@ -4,7 +4,7 @@ import java.util.UUID;
 
 public record CreateLogisticsRequest(
     UUID redistributionId,
-    UUID offerId,
+    String offerId,
     String pickupAddress,
     String deliveryAddress
 ) {}

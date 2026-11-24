@@ -14,11 +14,16 @@ public class Redistribution {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(nullable = false)
-    private UUID offerId;
+    // ids dos outros serviços são strings opacas (ex.: "offer-<uuid>", "org-<uuid>"), como no contrato
+    @Column(nullable = false, length = 100)
+    private String offerId;
 
-    @Column(nullable = false)
-    private UUID institutionId;
+    @Column(nullable = false, length = 100)
+    private String institutionId;
+
+    // reserva criada no offer-service (passo T2); usada na compensação e no cancelamento
+    @Column(length = 100)
+    private String reservationId;
 
     private UUID logisticsId;
 
