@@ -17,8 +17,9 @@ public class LogisticsOperation {
     @Column(nullable = false)
     private UUID redistributionId;
 
-    @Column(nullable = false)
-    private UUID offerId;
+    // id da oferta no offer-service: string opaca (ex.: "offer-<uuid>"), como no contrato
+    @Column(nullable = false, length = 100)
+    private String offerId;
 
     private String pickupAddress;
     private String deliveryAddress;

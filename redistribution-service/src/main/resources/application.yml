@@ -20,7 +20,7 @@ spring:
 
 ravita:
   services:
-    offer-url: ${OFFER_SERVICE_URL:http://localhost:8081}
+    offer-url: ${OFFER_SERVICE_URL:http://localhost:8082}
     logistics-url: ${LOGISTICS_SERVICE_URL:http://localhost:8084}
   rabbitmq:
     exchange: ${RABBITMQ_EXCHANGE:ravita.events}

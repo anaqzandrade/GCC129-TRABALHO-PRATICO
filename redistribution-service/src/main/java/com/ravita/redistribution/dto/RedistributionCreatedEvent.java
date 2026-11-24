@@ -6,7 +6,7 @@ import java.util.UUID;
 public record RedistributionCreatedEvent(
     String eventType,
     UUID redistributionId,
-    UUID offerId,
-    UUID institutionId,
+    String offerId,
+    String institutionId,
     LocalDateTime timestamp
 ) {}

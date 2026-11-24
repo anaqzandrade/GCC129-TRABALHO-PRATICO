@@ -7,6 +7,6 @@ public record LogisticsEvent(
     String eventType,
     UUID logisticsId,
     UUID redistributionId,
-    UUID offerId,
+    String offerId,
     LocalDateTime timestamp
 ) {}
