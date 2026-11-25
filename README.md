@@ -281,7 +281,7 @@ Nesta etapa estão sendo desenvolvidos:
 ### Pré-requisitos
 
 - Docker com Docker Compose v2 (no Windows e no macOS, o Docker Desktop já inclui os dois).
-- Portas livres no host: 8080 a 8084 e 15672.
+- Portas livres no host: 8000, 8080 a 8084 e 15672.
 - Não é preciso ter Java nem Maven instalados: cada serviço é compilado dentro do próprio container.
 
 ### Subir o sistema
@@ -299,6 +299,7 @@ Usuários e senhas têm valores padrão. Para trocá-los, copie `.env.example` p
 
 | Componente | Endereço no host | Banco próprio |
 |---|---|---|
+| **API Gateway** | http://localhost:8000 | — |
 | demand-matching-service | http://localhost:8080 | `matching_db` |
 | organization-service | http://localhost:8081 | `organization_db` |
 | offer-service | http://localhost:8082 | `offer_db` |
@@ -307,12 +308,14 @@ Usuários e senhas têm valores padrão. Para trocá-los, copie `.env.example` p
 | RabbitMQ (painel) | http://localhost:15672 (usuário `ravita`, senha `ravita`) | — |
 
 Cada serviço tem uma instância própria de PostgreSQL, numa rede interna que só ele acessa. Os bancos não são publicados no host.
-As portas dos serviços ficam publicadas para testes enquanto o API Gateway não existe; na Parte 4, só o gateway será exposto.
+O API Gateway é a entrada externa: encaminha `/portal/v1/**` e `/admin/v1/**` para os BFFs e cuida de autenticação,
+rate limiting e correlation ID (detalhes em [api-gateway/README.md](api-gateway/README.md)). As portas dos serviços
+continuam publicadas para testes até os BFFs ficarem prontos; depois, só o gateway ficará exposto.
 
 ### Verificar
 
 ```bash
-docker compose ps                                   # os 11 containers "healthy": bancos, RabbitMQ e os 5 serviços
+docker compose ps                                   # os 12 containers "healthy": bancos, RabbitMQ, os 5 serviços e o gateway
 curl http://localhost:8082/actuator/health          # {"status":"UP"}
 curl http://localhost:8081/api/v1/organizations
 curl http://localhost:8082/api/v1/offers

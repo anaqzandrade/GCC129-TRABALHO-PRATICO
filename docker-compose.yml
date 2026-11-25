@@ -5,6 +5,7 @@
 #   Apagar dados:  docker compose down -v
 #
 # Redes:
+#   bff                API Gateway + BFFs: o gateway não alcança os serviços de domínio
 #   services           serviços de domínio + RabbitMQ (comunicação entre serviços)
 #   <serviço>-data     rede interna de cada banco: só o próprio serviço enxerga o seu banco
 #
@@ -253,7 +254,26 @@ services:
     healthcheck: *spring-healthcheck
     restart: unless-stopped
 
+  # ---------------------------------------------------------------- API Gateway (única entrada externa)
+  api-gateway:
+    build: ./api-gateway
+    image: ravita/api-gateway:0.0.1
+    environment:
+      SERVER_PORT: 8000
+      JWT_SECRET: ${JWT_SECRET:-ravita-dev-secret-troque-no-env-2026}
+      PORTAL_BFF_URL: http://portal-bff:8091
+      ADMIN_BFF_URL: http://admin-bff:8092
+    networks:
+      # só alcança os BFFs (rede bff), nunca os serviços de domínio
+      - bff
+    ports:
+      - "8000:8000"
+    healthcheck: *spring-healthcheck
+    restart: unless-stopped
+
 networks:
+  # gateway e BFFs; os BFFs também ficam na rede services para chamar os serviços
+  bff:
   services:
   # internal: sem acesso de fora da rede; cada banco só é alcançável pelo próprio serviço
   organization-data:
