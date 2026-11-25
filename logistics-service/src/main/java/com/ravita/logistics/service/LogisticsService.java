@@ -8,6 +8,9 @@ import com.ravita.logistics.repository.LogisticsRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,6 +40,30 @@ public class LogisticsService {
                 .createdAt(LocalDateTime.now())
                 .build();
         return repository.save(op);
+    }
+
+    private static final int MAX_PAGE_SIZE = 100;
+
+    /** Listagem paginada para os BFFs; page começa em 1, como no resto do contrato. */
+    public Page<LogisticsOperation> list(LogisticsStatus status, UUID redistributionId, int page, int size) {
+        if (page < 1) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "page deve ser maior ou igual a 1");
+        }
+        if (size < 1 || size > MAX_PAGE_SIZE) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "size deve estar entre 1 e " + MAX_PAGE_SIZE);
+        }
+        PageRequest pageable = PageRequest.of(page - 1, size,
+                Sort.by(Sort.Order.desc("createdAt"), Sort.Order.asc("id")));
+        if (status != null && redistributionId != null) {
+            return repository.findByStatusAndRedistributionId(status, redistributionId, pageable);
+        }
+        if (status != null) {
+            return repository.findByStatus(status, pageable);
+        }
+        if (redistributionId != null) {
+            return repository.findByRedistributionId(redistributionId, pageable);
+        }
+        return repository.findAll(pageable);
     }
 
     public LogisticsOperation getById(UUID id) {

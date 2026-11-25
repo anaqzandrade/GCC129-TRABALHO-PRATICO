@@ -1,6 +1,7 @@
 package com.ravita.redistribution.client;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -35,9 +36,10 @@ public class ServiceClients {
      *
      * @return id da reserva criada no offer-service
      */
-    public String reserveOffer(String offerId, UUID redistributionId) {
+    public String reserveOffer(String offerId, UUID redistributionId, String correlationId) {
         Map<?, ?> reservation = offerClient.post()
                 .uri("/api/v1/offers/{offerId}/reservations", offerId)
+                .headers(headers -> correlation(headers, correlationId))
                 .body(Map.of("redistributionId", redistributionId.toString()))
                 .retrieve()
                 .body(Map.class);
@@ -48,15 +50,17 @@ public class ServiceClients {
      * C2 - ReleaseOffer (compensação de T2): DELETE /api/v1/offers/{offerId}/reservations/{reservationId}.
      * Liberar uma reserva já liberada também responde 204.
      */
-    public void releaseOffer(String offerId, String reservationId) {
+    public void releaseOffer(String offerId, String reservationId, String correlationId) {
         offerClient.delete()
                 .uri("/api/v1/offers/{offerId}/reservations/{reservationId}", offerId, reservationId)
+                .headers(headers -> correlation(headers, correlationId))
                 .retrieve()
                 .toBodilessEntity();
     }
 
-    /** T3 - CreateLogistics: POST /logistics. */
-    public UUID createLogistics(UUID redistributionId, String offerId, String pickup, String delivery) {
+    /** T3 - CreateLogistics: POST /api/v1/logistics. */
+    public UUID createLogistics(UUID redistributionId, String offerId, String pickup, String delivery,
+                                String correlationId) {
         Map<String, Object> body = Map.of(
                 "redistributionId", redistributionId,
                 "offerId", offerId,
@@ -65,12 +69,20 @@ public class ServiceClients {
         );
 
         Map<?, ?> response = logisticsClient.post()
-                .uri("/logistics")
+                .uri("/api/v1/logistics")
+                .headers(headers -> correlation(headers, correlationId))
                 .body(body)
                 .retrieve()
                 .body(Map.class);
 
         return UUID.fromString(response.get("id").toString());
+    }
+
+    /** Repassa o X-Correlation-ID da SAGA: os logs dos três serviços ficam com o mesmo id. */
+    private static void correlation(HttpHeaders headers, String correlationId) {
+        if (correlationId != null) {
+            headers.set("X-Correlation-ID", correlationId);
+        }
     }
 
     private static SimpleClientHttpRequestFactory timeouts() {
