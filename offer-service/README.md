@@ -14,6 +14,7 @@ O orquestrador é o redistribution-service.
 |---|---|---|---|
 | `POST /api/v1/offers` | doador (via Portal BFF) | `201 Offer`, `Location`, `ETag` | `422 INVALID_DONOR`, `INVALID_QUANTITY`, `INVALID_WINDOW` |
 | `GET /api/v1/offers` | BFFs | `200 Page<OfferSummary>` | `400` para filtro desconhecido ou inválido |
+| `GET /api/v1/offers/available` | Portal BFF e assistente (LLM) | `200 Page<AvailableOffer>`, lido do modelo de leitura (CQRS) | `400` para filtro desconhecido ou inválido |
 | `GET /api/v1/offers/{offerId}` | BFFs e serviços | `200 Offer`, `ETag` | `404` |
 | `GET /api/v1/offers/statistics` | Admin BFF | `200 Statistics` | — |
 | `POST /api/v1/offers/{offerId}/reservations` | redistribution | `201 Reservation`, `Location` | `409 OFFER_NOT_AVAILABLE`, `422 INVALID_REDISTRIBUTION` |
@@ -23,6 +24,9 @@ O orquestrador é o redistribution-service.
 Filtros de `GET /offers`: `page` (≥ 1, padrão 1), `size` (1 a 100, padrão 20), `status`, `category`, `city`
 e `donorId`. O filtro `city` ignora acentos e maiúsculas. Com `status=AVAILABLE`, ofertas cuja janela já
 terminou ficam de fora.
+
+Filtros de `GET /offers/available`: `page`, `size`, `category` e `city`. A resposta vem do modelo de
+leitura e traz `lastEvent`, `eventOccurredAt` e `projectedAt`, que mostram de qual evento veio o dado.
 
 Todas as respostas devolvem `X-Correlation-ID`, e todo erro segue o formato `{code, message, correlationId, details?}`.
 
@@ -147,6 +151,15 @@ Sem `ports`, dá para escalar: `docker compose up -d --scale offer-service=3`.
 | liberar a reserva (compensação) | `OfferReleased` (ou `OfferExpired`, se a janela já acabou) | `offer.released` (ou `offer.expired`) |
 | job de expiração | `OfferExpired` | `offer.expired` |
 
+- **CQRS** (doc 03, seções 11 a 15). O modelo de escrita é a tabela `offers`, usada pelos comandos. O
+  modelo de leitura é a tabela `available_offers_read` (migration `V3`), desnormalizada (inclui o nome do
+  doador) e atualizada só pelos eventos: o próprio serviço consome a fila `offer-service.read-model-queue`
+  (`offer.#`). Cada evento traz o retrato da oferta depois da mudança, e a projeção só aplica um evento
+  mais novo que o já aplicado (`aggregateVersion`), então eventos repetidos ou fora de ordem não estragam
+  a leitura. `GET /offers/available` lê só dessa tabela; na prática a defasagem fica em torno de 1 s,
+  o intervalo do publicador do outbox (o limite combinado no doc 03 é 5 s). A reserva continua validada no modelo de escrita: uma oferta que ainda
+  aparece como disponível na leitura não pode ser reservada duas vezes.
+
 ## Pendências (Parte 4)
 
 - `PATCH /offers/{id}` com `If-Match`, `POST /offers/{id}/cancellation` e os links `edit`/`cancel`
@@ -154,6 +167,5 @@ Sem `ports`, dá para escalar: `docker compose up -d --scale offer-service=3`.
 - Eventos `OfferUpdated` e `OfferCancelled`, quando existirem o `PATCH` e o cancelamento (o outbox já
   está pronto para eles)
 - Consumir `logistics.food.collected` e `logistics.food.delivered` (→ `COLLECTED` / `COMPLETED`)
-- CQRS: projeção `available_offers_read` para as buscas
 - Escopo por usuário (`Offer` × `OfferSummary`, quem pode reservar), quando o gateway e os BFFs
   passarem a identidade

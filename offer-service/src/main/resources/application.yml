@@ -25,6 +25,14 @@ spring:
     password: ${RABBITMQ_PASSWORD:guest}
     # O RabbitMQ confirma cada mensagem recebida; só depois disso a linha do outbox vira PUBLISHED.
     publisher-confirm-type: simple
+    # Consumidor do modelo de leitura: um evento que falha 3 vezes seguidas é descartado e fica
+    # registrado no log, em vez de voltar para a fila para sempre.
+    listener:
+      simple:
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 1s
   jackson:
     # Contrato: campos desconhecidos na entrada retornam 400.
     deserialization:

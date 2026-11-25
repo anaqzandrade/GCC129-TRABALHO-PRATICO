@@ -1,12 +1,14 @@
 package com.ravita.offer.api;
 
 import com.ravita.offer.api.dto.AddressDto;
+import com.ravita.offer.api.dto.AvailableOfferResponse;
 import com.ravita.offer.api.dto.LinkDto;
 import com.ravita.offer.api.dto.OfferResponse;
 import com.ravita.offer.api.dto.OfferSummaryResponse;
 import com.ravita.offer.api.dto.ReservationResponse;
 import com.ravita.offer.domain.Offer;
 import com.ravita.offer.domain.Reservation;
+import com.ravita.offer.readmodel.AvailableOfferRead;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
@@ -66,6 +68,29 @@ public class OfferMapper {
                 offer.getPickupAddress().getState(),
                 time(offer.getCreatedAt()),
                 links(offer));
+    }
+
+    /** Item do modelo de leitura (CQRS). O link reserve leva ao modelo de escrita, que valida de novo. */
+    public AvailableOfferResponse toAvailable(AvailableOfferRead row) {
+        Map<String, LinkDto> links = new LinkedHashMap<>();
+        links.put("self", LinkDto.get(offerPath(row.getOfferId())));
+        links.put("donor", LinkDto.get("/api/v1/organizations/" + row.getDonorId()));
+        links.put("reserve", LinkDto.post(offerPath(row.getOfferId()) + "/reservations"));
+        return new AvailableOfferResponse(
+                row.getOfferId(),
+                row.getDonorId(),
+                row.getDonorName(),
+                row.getFoodCategory(),
+                row.getDescription(),
+                plain(row.getQuantity()),
+                row.getUnit(),
+                row.getCity(),
+                time(row.getAvailableUntil()),
+                row.getStatus(),
+                row.getLastEventType(),
+                time(row.getEventOccurredAt()),
+                time(row.getProjectedAt()),
+                links);
     }
 
     public ReservationResponse toResponse(Reservation reservation) {

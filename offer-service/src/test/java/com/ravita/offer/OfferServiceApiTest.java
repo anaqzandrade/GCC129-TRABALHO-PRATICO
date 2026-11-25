@@ -5,16 +5,23 @@ import com.ravita.offer.api.error.ApiException;
 import com.ravita.offer.client.OrganizationClient;
 import com.ravita.offer.client.OrganizationView;
 import com.ravita.offer.domain.Offer;
+import com.ravita.offer.domain.OfferStatus;
 import com.ravita.offer.outbox.OfferEventType;
 import com.ravita.offer.outbox.OfferOutbox;
 import com.ravita.offer.outbox.OutboxEvent;
 import com.ravita.offer.outbox.OutboxRepository;
 import com.ravita.offer.outbox.OutboxStatus;
+import com.ravita.offer.readmodel.AvailableOfferRead;
+import com.ravita.offer.readmodel.AvailableOfferReadRepository;
+import com.ravita.offer.readmodel.OfferProjectionConsumer;
+import com.ravita.offer.readmodel.ProcessedReadEventRepository;
 import com.ravita.offer.repository.OfferRepository;
 import com.ravita.offer.repository.ReservationRepository;
 import com.ravita.offer.service.OfferService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.amqp.core.Message;
+import org.springframework.amqp.core.MessageProperties;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -29,7 +36,9 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.IllegalTransactionStateException;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
@@ -100,6 +109,15 @@ class OfferServiceApiTest {
     @Autowired
     private OfferOutbox offerOutbox;
 
+    @Autowired
+    private OfferProjectionConsumer projectionConsumer;
+
+    @Autowired
+    private AvailableOfferReadRepository readRepository;
+
+    @Autowired
+    private ProcessedReadEventRepository processedReadEventRepository;
+
     @MockitoBean
     private OrganizationClient organizationClient;
 
@@ -107,6 +125,8 @@ class OfferServiceApiTest {
     void setUp() {
         clock.set(NOW);
         outboxRepository.deleteAll();
+        processedReadEventRepository.deleteAll();
+        readRepository.deleteAll();
         reservationRepository.deleteAll();
         offerRepository.deleteAll();
         OrganizationView donor = new OrganizationView(DONOR_ID, "Mercado Central", "DONOR", true,
@@ -435,6 +455,123 @@ class OfferServiceApiTest {
 
         assertThatThrownBy(() -> offerOutbox.record(offer, OfferEventType.OFFER_RESERVED))
                 .isInstanceOf(IllegalTransactionStateException.class);
+    }
+
+    // ---- CQRS: modelo de leitura ----
+
+    @Test
+    void readModelShowsTheOfferOnlyAfterItsEventIsProjected() throws Exception {
+        String offerId = createOffer(OFFER_JSON);
+
+        // consistência eventual: a oferta existe no modelo de escrita, mas o evento ainda não chegou
+        mvc.perform(get("/api/v1/offers/available"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total").value(0));
+
+        projectEventsOf(offerId);
+
+        mvc.perform(get("/api/v1/offers/available"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total").value(1))
+                .andExpect(jsonPath("$.items[0].id").value(offerId))
+                .andExpect(jsonPath("$.items[0].donorName").value("Mercado Central"))
+                .andExpect(jsonPath("$.items[0].status").value("AVAILABLE"))
+                .andExpect(jsonPath("$.items[0].lastEvent").value("OfferCreated"))
+                .andExpect(jsonPath("$.items[0].projectedAt").exists())
+                .andExpect(jsonPath("$.items[0]._links.reserve.method").value("POST"));
+    }
+
+    @Test
+    void reservedOfferLeavesTheReadModelAndComesBackWhenReleased() throws Exception {
+        String offerId = createOffer(OFFER_JSON);
+        String reservationId = reserve(offerId, "red-1");
+        projectEventsOf(offerId);
+
+        mvc.perform(get("/api/v1/offers/available")).andExpect(jsonPath("$.total").value(0));
+        assertThat(readRepository.findById(offerId).orElseThrow().getStatus()).isEqualTo(OfferStatus.RESERVED);
+
+        mvc.perform(delete("/api/v1/offers/{id}/reservations/{rid}", offerId, reservationId))
+                .andExpect(status().isNoContent());
+        projectEventsOf(offerId);
+
+        mvc.perform(get("/api/v1/offers/available"))
+                .andExpect(jsonPath("$.total").value(1))
+                .andExpect(jsonPath("$.items[0].lastEvent").value("OfferReleased"));
+    }
+
+    @Test
+    void olderAndRepeatedEventsDoNotChangeTheProjection() throws Exception {
+        String offerId = createOffer(OFFER_JSON);
+        reserve(offerId, "red-1");
+        OutboxEvent created = eventOf(offerId, "OfferCreated");
+        OutboxEvent reserved = eventOf(offerId, "OfferReserved");
+
+        // fora de ordem, como pode acontecer com várias réplicas: o OfferReserved (v1) chega antes
+        projectionConsumer.onOfferEvent(message(reserved));
+        projectionConsumer.onOfferEvent(message(created));
+
+        AvailableOfferRead row = readRepository.findById(offerId).orElseThrow();
+        assertThat(row.getStatus()).isEqualTo(OfferStatus.RESERVED);
+        assertThat(row.getAggregateVersion()).isEqualTo(1);
+        // o OfferCreated atrasado não muda o estado, mas ainda completa o nome do doador
+        assertThat(row.getDonorName()).isEqualTo("Mercado Central");
+
+        // o mesmo eventId de novo não é aplicado nem registrado outra vez
+        projectionConsumer.onOfferEvent(message(reserved));
+        assertThat(processedReadEventRepository.count()).isEqualTo(2);
+    }
+
+    @Test
+    void readModelFiltersByCategoryAndCityAndHidesClosedWindows() throws Exception {
+        String offerId = createOffer(OFFER_JSON);
+        projectEventsOf(offerId);
+
+        mvc.perform(get("/api/v1/offers/available").param("category", "FRUITS"))
+                .andExpect(jsonPath("$.total").value(0));
+        mvc.perform(get("/api/v1/offers/available").param("category", "VEGETABLES").param("city", "LAVRAS"))
+                .andExpect(jsonPath("$.total").value(1));
+        mvc.perform(get("/api/v1/offers/available").param("cor", "azul"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+        // a janela fechou: some da consulta mesmo antes do job de expiração rodar
+        clock.set(AFTER_WINDOW);
+        mvc.perform(get("/api/v1/offers/available")).andExpect(jsonPath("$.total").value(0));
+    }
+
+    @Test
+    void reservationIsValidatedByTheWriteModelEvenWhenTheReadModelIsStale() throws Exception {
+        String offerId = createOffer(OFFER_JSON);
+        projectEventsOf(offerId);
+        reserve(offerId, "red-1");
+
+        // o OfferReserved ainda não foi projetado: a leitura continua mostrando a oferta
+        mvc.perform(get("/api/v1/offers/available")).andExpect(jsonPath("$.total").value(1));
+
+        mvc.perform(post("/api/v1/offers/{id}/reservations", offerId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"redistributionId\": \"red-2\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("OFFER_NOT_AVAILABLE"));
+    }
+
+    /** Entrega à projeção, em ordem de versão, os eventos que o outbox gravou para a oferta. */
+    private void projectEventsOf(String offerId) {
+        outboxRepository.findByAggregateId(offerId).stream()
+                .sorted(Comparator.comparingInt(
+                        (OutboxEvent event) -> JsonPath.<Integer>read(event.getPayload(), "$.aggregateVersion")))
+                .forEach(event -> projectionConsumer.onOfferEvent(message(event)));
+    }
+
+    private OutboxEvent eventOf(String offerId, String eventType) {
+        return outboxRepository.findByAggregateId(offerId).stream()
+                .filter(event -> event.getEventType().equals(eventType))
+                .findFirst()
+                .orElseThrow();
+    }
+
+    private static Message message(OutboxEvent event) {
+        return new Message(event.getPayload().getBytes(StandardCharsets.UTF_8), new MessageProperties());
     }
 
     private List<String> eventTypes(String offerId) {
