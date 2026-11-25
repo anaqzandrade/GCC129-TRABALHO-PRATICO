@@ -1,4 +1,4 @@
-FROM maven:3.9.9-eclipse-temurin-21 AS build
+FROM maven:3.9.9-eclipse-temurin-21-alpine AS build
 WORKDIR /app
 # pom.xml primeiro: as dependências ficam numa camada em cache e só são
 # baixadas de novo quando o pom muda, não a cada alteração no código
@@ -7,9 +7,10 @@ RUN mvn -B -q dependency:go-offline
 COPY src src
 RUN mvn -B -q -DskipTests package
 
-FROM eclipse-temurin:21-jre
+# Alpine, como os outros serviços: imagem menor e com o wget usado pelo healthcheck
+FROM eclipse-temurin:21-jre-alpine
 # a aplicação não roda como root dentro do container
-RUN groupadd --system ravita && useradd --system --gid ravita ravita
+RUN addgroup -S ravita && adduser -S ravita -G ravita
 WORKDIR /app
 COPY --from=build --chown=ravita:ravita /app/target/organization-service-0.0.1-SNAPSHOT.jar app.jar
 USER ravita

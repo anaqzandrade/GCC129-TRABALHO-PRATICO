@@ -312,7 +312,7 @@ As portas dos serviços ficam publicadas para testes enquanto o API Gateway não
 ### Verificar
 
 ```bash
-docker compose ps                                   # todos os containers "running"; bancos, RabbitMQ e offer-service "healthy"
+docker compose ps                                   # os 11 containers "healthy": bancos, RabbitMQ e os 5 serviços
 curl http://localhost:8082/actuator/health          # {"status":"UP"}
 curl http://localhost:8081/api/v1/organizations
 curl http://localhost:8082/api/v1/offers

@@ -67,8 +67,8 @@ Cada serviço participa de duas redes: a rede `services`, compartilhada, e a red
 
 | Serviço | Estágio de build | Estágio final | Cache de dependências | Jar em camadas | Usuário não-root | `.dockerignore` |
 |---|---|---|---|---|---|---|
-| organization-service | `maven:3.9.9-eclipse-temurin-21` | `eclipse-temurin:21-jre` | sim | não | sim | sim |
-| demand-matching-service | `maven:3.9-eclipse-temurin-17` | `eclipse-temurin:17-jre-alpine` | sim | não | sim | não |
+| organization-service | `maven:3.9.9-eclipse-temurin-21-alpine` | `eclipse-temurin:21-jre-alpine` | sim | não | sim | sim |
+| demand-matching-service | `maven:3.9-eclipse-temurin-17` | `eclipse-temurin:17-jre-alpine` | sim | não | sim | sim |
 | offer-service | `maven:3.9.9-eclipse-temurin-21-alpine` | `eclipse-temurin:21-jre-alpine` | sim | sim | sim | sim |
 | redistribution-service | `maven:3.9.9-eclipse-temurin-21-alpine` | `eclipse-temurin:21-jre-alpine` | sim | não | sim | sim |
 | logistics-service | `maven:3.9.9-eclipse-temurin-21-alpine` | `eclipse-temurin:21-jre-alpine` | sim | não | sim | sim |
@@ -186,7 +186,7 @@ Consequências:
 
 - **Bancos**: `pg_isready`.
 - **RabbitMQ**: `rabbitmq-diagnostics -q ping`.
-- **offer-service**: `/actuator/health`, que inclui o estado do banco.
+- **Os 5 serviços**: `/actuator/health` (Spring Boot Actuator), que inclui o estado do banco e, no demand-matching, no logistics e no redistribution, o do RabbitMQ. O teste é um único bloco (`x-spring-healthcheck`) reaproveitado pelos cinco: o `wget` usa a variável `SERVER_PORT` de cada container.
 
 Cada serviço usa `depends_on` com `condition: service_healthy` para o próprio banco e para o RabbitMQ. Sem o healthcheck, o `depends_on` só garantiria que o container do banco foi criado, não que o PostgreSQL já aceita conexões. Dependências entre serviços (offer → organization, redistribution → offer e logistics) usam `service_started`, porque as chamadas REST acontecem durante o uso, não na inicialização.
 
@@ -214,7 +214,6 @@ docker compose -f docker-compose.yml -f docker-compose.scale.yml up -d --scale o
 ## 12. Limitações e próximos passos
 
 - O API Gateway e os BFFs entram na Parte 4. Até lá, as portas dos serviços ficam publicadas no host para testes; depois, só o gateway será exposto.
-- Apenas o offer-service tem Actuator; os demais serviços ainda não têm healthcheck próprio.
 - O demand-matching-service usa Java 17; os demais usam Java 21.
 
 ---

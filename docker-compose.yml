@@ -34,6 +34,16 @@ x-rabbit-env: &rabbit-env
   RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-ravita}
   RABBITMQ_EXCHANGE: ravita.events
 
+# healthcheck dos 5 serviços: /actuator/health responde UP só quando a aplicação subiu
+# e o banco dela (e o RabbitMQ, nos que usam mensageria) responde.
+# O $$ escapa o $: o ${SERVER_PORT} é lido dentro do container, então o mesmo bloco serve para todos.
+x-spring-healthcheck: &spring-healthcheck
+  test: ["CMD-SHELL", "wget -qO- http://localhost:$${SERVER_PORT}/actuator/health > /dev/null || exit 1"]
+  interval: 10s
+  timeout: 3s
+  start_period: 40s
+  retries: 5
+
 services:
 
   # ---------------------------------------------------------------- mensageria
@@ -85,6 +95,7 @@ services:
       - organization-data
     ports:
       - "8081:8081"
+    healthcheck: *spring-healthcheck
     restart: unless-stopped
 
   # ---------------------------------------------------------------- offer
@@ -120,13 +131,7 @@ services:
     ports:
       # para escalar, use docker-compose.scale.yml, que remove esta porta publicada
       - "8082:8082"
-    healthcheck:
-      # /actuator/health inclui o banco: só fica healthy se o PostgreSQL responder
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8082/actuator/health > /dev/null || exit 1"]
-      interval: 10s
-      timeout: 3s
-      start_period: 40s
-      retries: 5
+    healthcheck: *spring-healthcheck
     restart: unless-stopped
 
   # ---------------------------------------------------------------- demand/matching
@@ -164,6 +169,7 @@ services:
       - matching-data
     ports:
       - "8080:8080"
+    healthcheck: *spring-healthcheck
     restart: unless-stopped
 
   # ---------------------------------------------------------------- logistics
@@ -198,6 +204,7 @@ services:
       - logistics-data
     ports:
       - "8084:8084"
+    healthcheck: *spring-healthcheck
     restart: unless-stopped
 
   # ---------------------------------------------------------------- redistribution (orquestrador da SAGA)
@@ -238,6 +245,7 @@ services:
       - redistribution-data
     ports:
       - "8083:8083"
+    healthcheck: *spring-healthcheck
     restart: unless-stopped
 
 networks:
