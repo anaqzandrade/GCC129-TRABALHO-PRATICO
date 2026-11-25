@@ -5,7 +5,8 @@ import org.springframework.stereotype.Component;
 
 /**
  * Marca periodicamente como EXPIRED as ofertas disponíveis cuja janela terminou.
- * Com várias réplicas todas rodam o job, mas o UPDATE é idempotente.
+ * Com várias réplicas todas rodam o job: cada oferta é expirada numa transação própria com @Version,
+ * então só uma réplica grava a mudança e o evento OfferExpired; as outras pulam a oferta.
  */
 @Component
 public class OfferExpirationJob {

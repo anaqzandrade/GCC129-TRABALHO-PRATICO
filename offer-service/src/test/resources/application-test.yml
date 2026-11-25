@@ -18,3 +18,6 @@ ravita:
   expiration:
     # o job não roda durante os testes; eles chamam expireOverdue() quando precisam
     interval-ms: 3600000
+  outbox:
+    # sem RabbitMQ nos testes: eles conferem as linhas gravadas em outbox_events
+    publisher-enabled: false

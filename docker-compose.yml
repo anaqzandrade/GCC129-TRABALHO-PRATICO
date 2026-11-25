@@ -113,6 +113,7 @@ services:
     build: ./offer-service
     image: ravita/offer-service:0.0.1
     environment:
+      <<: *rabbit-env
       SERVER_PORT: 8082
       DB_HOST: offer-db
       DB_PORT: 5432
@@ -124,6 +125,10 @@ services:
       offer-db:
         condition: service_healthy
       organization-service:
+        condition: service_started
+      # service_started, e não healthy: com o RabbitMQ fora do ar o offer funciona,
+      # e os eventos esperam no outbox até ele responder
+      rabbitmq:
         condition: service_started
     networks:
       - services

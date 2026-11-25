@@ -131,14 +131,28 @@ Sem `ports`, dá para escalar: `docker compose up -d --scale offer-service=3`.
   (`ORGANIZATION_SERVICE_TIMEOUT`, padrão 2s); falha vira `503`, e timeout vira `504`.
 - **Schema pelo Flyway** (`ddl-auto: none`): o Hibernate nunca altera tabelas.
 - **Expiração.** Um job (`OFFER_EXPIRATION_INTERVAL_MS`, padrão 60s) marca como `EXPIRED` as ofertas
-  disponíveis cuja janela terminou. O UPDATE é idempotente, então várias réplicas podem rodar ao mesmo tempo.
+  disponíveis cuja janela terminou. Cada oferta é expirada numa transação própria, com `@Version`: se
+  várias réplicas rodam o job ao mesmo tempo, só uma grava a mudança e o evento.
+- **Transactional Outbox** (doc 03, seções 6 a 9). Criar, reservar, liberar e expirar gravam, na mesma
+  transação, uma linha em `outbox_events` (migration `V2`). O `OutboxPublisher` publica as linhas
+  `PENDING` em `ravita.events` a cada 1s (`OUTBOX_INTERVAL_MS`) e só marca `PUBLISHED` depois da
+  confirmação do RabbitMQ (publisher confirm). Com o RabbitMQ fora do ar, a API continua funcionando e
+  os eventos esperam no outbox; por isso o RabbitMQ não entra no `/actuator/health` deste serviço.
+  `FOR UPDATE SKIP LOCKED` impede que duas réplicas publiquem a mesma linha.
+
+| Mudança | Evento | Routing key |
+|---|---|---|
+| criar oferta | `OfferCreated` | `offer.created` |
+| reservar (T2 da SAGA) | `OfferReserved` | `offer.reserved` |
+| liberar a reserva (compensação) | `OfferReleased` (ou `OfferExpired`, se a janela já acabou) | `offer.released` (ou `offer.expired`) |
+| job de expiração | `OfferExpired` | `offer.expired` |
 
 ## Pendências (Parte 4)
 
 - `PATCH /offers/{id}` com `If-Match`, `POST /offers/{id}/cancellation` e os links `edit`/`cancel`
 - `Idempotency-Key` durável em todo `POST`
-- Outbox (`outbox_events`) e os eventos `OfferCreated`, `OfferUpdated`, `OfferReserved`, `OfferReleased`,
-  `OfferCancelled` e `OfferExpired` em `ravita.events` (doc 03)
+- Eventos `OfferUpdated` e `OfferCancelled`, quando existirem o `PATCH` e o cancelamento (o outbox já
+  está pronto para eles)
 - Consumir `logistics.food.collected` e `logistics.food.delivered` (→ `COLLECTED` / `COMPLETED`)
 - CQRS: projeção `available_offers_read` para as buscas
 - Escopo por usuário (`Offer` × `OfferSummary`, quem pode reservar), quando o gateway e os BFFs

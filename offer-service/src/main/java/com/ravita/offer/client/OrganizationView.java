@@ -8,7 +8,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
  * (necessário porque a entrada deste serviço rejeita campos desconhecidos).
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
-public record OrganizationView(String id, String type, Boolean active, OrganizationAddress address) {
+public record OrganizationView(String id, String name, String type, Boolean active, OrganizationAddress address) {
 
     public boolean isActiveDonor() {
         return "DONOR".equals(type) && Boolean.TRUE.equals(active);

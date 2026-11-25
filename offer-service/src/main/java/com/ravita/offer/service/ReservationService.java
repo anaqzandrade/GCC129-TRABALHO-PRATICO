@@ -2,7 +2,10 @@ package com.ravita.offer.service;
 
 import com.ravita.offer.api.error.ApiException;
 import com.ravita.offer.domain.Offer;
+import com.ravita.offer.domain.OfferStatus;
 import com.ravita.offer.domain.Reservation;
+import com.ravita.offer.outbox.OfferEventType;
+import com.ravita.offer.outbox.OfferOutbox;
 import com.ravita.offer.repository.OfferRepository;
 import com.ravita.offer.repository.ReservationRepository;
 import org.slf4j.Logger;
@@ -19,6 +22,8 @@ import java.util.Optional;
  * Passo T2 da SAGA de redistribuição (orquestrada pelo redistribution-service):
  * reservar a oferta (ReserveOffer) e a compensação, liberar a reserva (ReleaseOffer).
  * As duas operações são idempotentes, porque o orquestrador pode repetir comandos.
+ * Cada mudança efetiva grava o seu evento no outbox, na mesma transação; uma repetição que não muda
+ * nada não gera evento.
  */
 @Service
 public class ReservationService {
@@ -27,12 +32,14 @@ public class ReservationService {
 
     private final OfferRepository offerRepository;
     private final ReservationRepository reservationRepository;
+    private final OfferOutbox outbox;
     private final Clock clock;
 
     public ReservationService(OfferRepository offerRepository, ReservationRepository reservationRepository,
-                              Clock clock) {
+                              OfferOutbox outbox, Clock clock) {
         this.offerRepository = offerRepository;
         this.reservationRepository = reservationRepository;
+        this.outbox = outbox;
         this.clock = clock;
     }
 
@@ -63,6 +70,7 @@ public class ReservationService {
             log.info("Reserva concorrente perdeu a disputa pela oferta {}", offerId);
             throw offerNotAvailable();
         }
+        outbox.record(offer, OfferEventType.OFFER_RESERVED);
         log.info("Oferta {} reservada pela redistribuição {} (reserva {})",
                 offerId, redistributionId, reservation.getId());
         return reservation;
@@ -95,6 +103,9 @@ public class ReservationService {
         offer.markReleased(now);
         reservationRepository.save(reservation);
         offerRepository.saveAndFlush(offer);
+        // liberada depois do fim da janela, a oferta vence em vez de voltar a ficar disponível
+        outbox.record(offer, offer.getStatus() == OfferStatus.EXPIRED
+                ? OfferEventType.OFFER_EXPIRED : OfferEventType.OFFER_RELEASED);
         log.info("Reserva {} liberada; oferta {} agora está {}", reservationId, offerId, offer.getStatus());
     }
 

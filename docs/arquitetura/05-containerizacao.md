@@ -53,6 +53,7 @@ flowchart LR
     OFF -->|REST| ORG
     RED -->|REST| OFF
     RED -->|REST| LOG
+    OFF -->|eventos via outbox| MQ
     LOG -->|eventos| MQ
     RED -->|eventos| MQ
     MQ -->|eventos| RED
@@ -135,7 +136,7 @@ Nenhum endereço de banco, broker ou serviço fica fixo na imagem: tudo vem do `
 |---|---|
 | organization-service | `SERVER_PORT`, `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD` |
 | demand-matching-service | `SERVER_PORT`, `SPRING_DATASOURCE_*`, `SPRING_RABBITMQ_*` |
-| offer-service | `SERVER_PORT`, `DB_*`, `ORGANIZATION_SERVICE_URL` |
+| offer-service | `SERVER_PORT`, `DB_*`, `RABBITMQ_*`, `ORGANIZATION_SERVICE_URL` |
 | redistribution-service | `SERVER_PORT`, `DB_*`, `RABBITMQ_*`, `OFFER_SERVICE_URL`, `LOGISTICS_SERVICE_URL` |
 | logistics-service | `SERVER_PORT`, `DB_*`, `RABBITMQ_*` |
 
