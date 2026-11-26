@@ -82,6 +82,26 @@ class PortalViewsTest {
     }
 
     @Test
+    void assistantAnswerHidesOperationalData() throws Exception {
+        JsonNode source = mapper.readTree("""
+                {"answer":"Pode doar [1].","mode":"llm","notice":null,"retrieval":"vector",
+                 "sources":[{"ref":1,"title":"RDC 216/2004","section":"Conservação","source":"Anvisa","file":"rdc.md"}],
+                 "toolCalls":[{"name":"instituicoes_que_aceitam","args":{"categoria":"DAIRY"},"ok":true,"resultCount":2}],
+                 "usage":{"inputTokens":900,"outputTokens":80},"model":"gemini","circuitBreaker":"closed","latencyMs":1500}
+                """);
+
+        ObjectNode view = views.assistant(source);
+
+        assertThat(view.path("answer").asText()).isEqualTo("Pode doar [1].");
+        assertThat(view.at("/sources/0/title").asText()).isEqualTo("RDC 216/2004");
+        assertThat(view.at("/consultedData/0/tool").asText()).isEqualTo("instituicoes_que_aceitam");
+        assertThat(view.at("/consultedData/0/results").asInt()).isEqualTo(2);
+        for (String internal : new String[] {"usage", "model", "circuitBreaker", "retrieval"}) {
+            assertThat(view.has(internal)).as(internal).isFalse();
+        }
+    }
+
+    @Test
     void springDataPageBecomesTheContractPage() throws Exception {
         JsonNode springPage = mapper.readTree("""
                 {"content":[{"id":"dem-1"}],"number":0,"size":20,"totalElements":1}

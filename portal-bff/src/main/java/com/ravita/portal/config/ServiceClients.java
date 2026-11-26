@@ -34,6 +34,8 @@ public class ServiceClients {
     private static final int CONNECT_TIMEOUT_MS = 2_000;
     /* a SAGA responde de forma síncrona e, numa falha com compensação, leva alguns segundos */
     private static final int READ_TIMEOUT_MS = 12_000;
+    /* o assistant-service responde em até 12 s (orçamento por pergunta); o gateway corta em 15 s */
+    private static final int ASSISTANT_READ_TIMEOUT_MS = 14_000;
     private static final List<String> PROPAGATED = List.of(CurrentUser.USER_ID, CurrentUser.ORG_ID, CurrentUser.ROLES);
 
     private final RestClient offer;
@@ -41,17 +43,20 @@ public class ServiceClients {
     private final RestClient matching;
     private final RestClient redistribution;
     private final RestClient logistics;
+    private final RestClient assistant;
 
     public ServiceClients(@Value("${ravita.services.offer-url}") String offerUrl,
                           @Value("${ravita.services.organization-url}") String organizationUrl,
                           @Value("${ravita.services.matching-url}") String matchingUrl,
                           @Value("${ravita.services.redistribution-url}") String redistributionUrl,
-                          @Value("${ravita.services.logistics-url}") String logisticsUrl) {
+                          @Value("${ravita.services.logistics-url}") String logisticsUrl,
+                          @Value("${ravita.services.assistant-url}") String assistantUrl) {
         this.offer = client(offerUrl);
         this.organization = client(organizationUrl);
         this.matching = client(matchingUrl);
         this.redistribution = client(redistributionUrl);
         this.logistics = client(logisticsUrl);
+        this.assistant = client(assistantUrl, ASSISTANT_READ_TIMEOUT_MS);
     }
 
     public RestClient offer() { return offer; }
@@ -59,6 +64,7 @@ public class ServiceClients {
     public RestClient matching() { return matching; }
     public RestClient redistribution() { return redistribution; }
     public RestClient logistics() { return logistics; }
+    public RestClient assistant() { return assistant; }
 
     /**
      * Executa a chamada; serviço inacessível vira 503 e serviço que não responde a tempo vira 504.
@@ -100,9 +106,13 @@ public class ServiceClients {
     }
 
     private static RestClient client(String baseUrl) {
+        return client(baseUrl, READ_TIMEOUT_MS);
+    }
+
+    private static RestClient client(String baseUrl, int readTimeoutMs) {
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
         factory.setConnectTimeout(CONNECT_TIMEOUT_MS);
-        factory.setReadTimeout(READ_TIMEOUT_MS);
+        factory.setReadTimeout(readTimeoutMs);
         return RestClient.builder()
                 .baseUrl(baseUrl)
                 .requestFactory(factory)

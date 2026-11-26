@@ -140,6 +140,33 @@ public class PortalViews {
         return view;
     }
 
+    /**
+     * Resposta do assistente para o Portal: o texto, as fontes e as consultas feitas. Tokens, modelo e estado
+     * do circuit breaker são dados de operação e ficam de fora.
+     */
+    public ObjectNode assistant(JsonNode source) {
+        ObjectNode view = mapper.createObjectNode();
+        copy(view, "answer", source, "answer");
+        copy(view, "mode", source, "mode");
+        copy(view, "notice", source, "notice");
+        ArrayNode sources = view.putArray("sources");
+        source.path("sources").forEach(item -> {
+            ObjectNode reference = sources.addObject();
+            copy(reference, "ref", item, "ref");
+            copy(reference, "title", item, "title");
+            copy(reference, "section", item, "section");
+            copy(reference, "source", item, "source");
+        });
+        ArrayNode consulted = view.putArray("consultedData");
+        source.path("toolCalls").forEach(call -> {
+            ObjectNode item = consulted.addObject();
+            copy(item, "tool", call, "name");
+            copy(item, "results", call, "resultCount");
+        });
+        copy(view, "latencyMs", source, "latencyMs");
+        return view;
+    }
+
     static String describe(String status) {
         if (status == null) {
             return "Situação desconhecida";

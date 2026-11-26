@@ -281,7 +281,7 @@ Nesta etapa estão sendo desenvolvidos:
 ### Pré-requisitos
 
 - Docker com Docker Compose v2 (no Windows e no macOS, o Docker Desktop já inclui os dois).
-- Portas livres no host: 8000, 8080 a 8084 e 15672.
+- Portas livres no host: 8000, 8080 a 8084, 8095 e 15672.
 - Não é preciso ter Java nem Maven instalados: cada serviço é compilado dentro do próprio container.
 
 ### Subir o sistema
@@ -294,6 +294,8 @@ docker compose up --build
 
 O primeiro build baixa as dependências Maven de cada serviço e pode levar alguns minutos; os seguintes reaproveitam o cache.
 Usuários e senhas têm valores padrão. Para trocá-los, copie `.env.example` para `.env` antes de subir.
+O assistente de doação usa a API do Gemini: crie uma chave no Google AI Studio e coloque `GOOGLE_API_KEY=...` no `.env`
+(o `.env` não vai para o git). Sem a chave, o assistente responde pelo fallback.
 
 ### Componentes e portas
 
@@ -307,6 +309,7 @@ Usuários e senhas têm valores padrão. Para trocá-los, copie `.env.example` p
 | offer-service | http://localhost:8082 | `offer_db` |
 | redistribution-service | http://localhost:8083 | `redistribution_db` |
 | logistics-service | http://localhost:8084 | `logistics_db` |
+| assistant-service (assistente de doação com LLM) | http://localhost:8095 | `assistant_db` (pgvector) |
 | RabbitMQ (painel) | http://localhost:15672 (usuário `ravita`, senha `ravita`) | — |
 
 Cada serviço tem uma instância própria de PostgreSQL, numa rede interna que só ele acessa. Os bancos não são publicados no host.
@@ -314,11 +317,13 @@ O API Gateway é a entrada externa: encaminha `/portal/v1/**` e `/admin/v1/**` p
 rate limiting e correlation ID (detalhes em [api-gateway/README.md](api-gateway/README.md)). Os BFFs não têm porta
 publicada: [portal-bff](portal-bff/README.md) e [admin-bff](admin-bff/README.md) só recebem requisições do gateway.
 Por enquanto, as portas dos serviços de domínio continuam publicadas para testes diretos.
+O assistente de doação ([assistant-service](assistant-service/README.md), detalhes no
+[doc 07](docs/arquitetura/07-llm.md)) responde pelo portal em `POST /portal/v1/assistant/questions`.
 
 ### Verificar
 
 ```bash
-docker compose ps                                   # os 14 containers "healthy": bancos, RabbitMQ, os 5 serviços, os 2 BFFs e o gateway
+docker compose ps                                   # os 16 containers "healthy": 6 bancos, RabbitMQ, 5 serviços, assistente, 2 BFFs e gateway
 curl http://localhost:8082/actuator/health          # {"status":"UP"}
 curl http://localhost:8081/api/v1/organizations
 curl http://localhost:8082/api/v1/offers

@@ -14,6 +14,7 @@ ravita:
     matching-url: ${MATCHING_SERVICE_URL:http://localhost:8080}
     redistribution-url: ${REDISTRIBUTION_SERVICE_URL:http://localhost:8083}
     logistics-url: ${LOGISTICS_SERVICE_URL:http://localhost:8084}
+    assistant-url: ${ASSISTANT_SERVICE_URL:http://localhost:8095}
 
 management:
   endpoints:

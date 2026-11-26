@@ -254,6 +254,54 @@ services:
     healthcheck: *spring-healthcheck
     restart: unless-stopped
 
+  # ---------------------------------------------------------------- assistente de doação (LLM, doc 07)
+  assistant-db:
+    <<: *postgres
+    image: pgvector/pgvector:pg17   # PostgreSQL 17 com a extensão pgvector: a base vetorial do RAG
+    environment:
+      <<: *db-credentials
+      POSTGRES_DB: assistant_db
+    volumes:
+      - assistant-db-data:/var/lib/postgresql/data
+    networks:
+      - assistant-data
+
+  assistant-service:
+    build: ./assistant-service
+    image: ravita/assistant-service:0.0.1
+    environment:
+      SERVER_PORT: 8095
+      # a chave fica no .env (fora do git); sem ela, o serviço responde pelo fallback
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      GEMINI_CHAT_MODEL: ${GEMINI_CHAT_MODEL:-gemini-3.1-flash-lite}
+      GEMINI_EMBEDDING_MODEL: ${GEMINI_EMBEDDING_MODEL:-models/gemini-embedding-2}
+      DB_HOST: assistant-db
+      DB_PORT: 5432
+      DB_NAME: assistant_db
+      DB_USERNAME: ${POSTGRES_USER:-ravita}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-ravita}
+      OFFER_SERVICE_URL: http://offer-service:8082
+      ORGANIZATION_SERVICE_URL: http://organization-service:8081
+    depends_on:
+      assistant-db:
+        condition: service_healthy
+      offer-service:
+        condition: service_started
+      organization-service:
+        condition: service_started
+    networks:
+      - services         # recebe o Portal BFF, chama offer e organization e sai para a API do Gemini
+      - assistant-data
+    ports:
+      - "8095:8095"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8095/health', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      start_period: 20s
+      retries: 5
+    restart: unless-stopped
+
   # ---------------------------------------------------------------- BFFs (só o gateway os alcança, pela rede bff)
   portal-bff:
     build: ./portal-bff
@@ -265,10 +313,13 @@ services:
       MATCHING_SERVICE_URL: http://demand-matching-service:8080
       REDISTRIBUTION_SERVICE_URL: http://redistribution-service:8083
       LOGISTICS_SERVICE_URL: http://logistics-service:8084
+      ASSISTANT_SERVICE_URL: http://assistant-service:8095
     depends_on:
       offer-service:
         condition: service_started
       organization-service:
+        condition: service_started
+      assistant-service:
         condition: service_started
       demand-matching-service:
         condition: service_started
@@ -343,6 +394,8 @@ networks:
     internal: true
   redistribution-data:
     internal: true
+  assistant-data:
+    internal: true
 
 volumes:
   rabbitmq-data:
@@ -351,3 +404,4 @@ volumes:
   matching-db-data:
   logistics-db-data:
   redistribution-db-data:
+  assistant-db-data:

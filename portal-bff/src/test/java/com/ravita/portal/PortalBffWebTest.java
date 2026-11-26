@@ -19,7 +19,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         "ravita.services.organization-url=http://localhost:1",
         "ravita.services.matching-url=http://localhost:1",
         "ravita.services.redistribution-url=http://localhost:1",
-        "ravita.services.logistics-url=http://localhost:1"
+        "ravita.services.logistics-url=http://localhost:1",
+        "ravita.services.assistant-url=http://localhost:1"
 })
 @AutoConfigureMockMvc
 class PortalBffWebTest {
@@ -45,6 +46,26 @@ class PortalBffWebTest {
                         .content("{}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+    }
+
+    @Test
+    void assistantNeedsAQuestion() throws Exception {
+        mvc.perform(post("/portal/v1/assistant/questions")
+                        .header("X-Roles", "DONOR").header("X-Org-Id", "org-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"question\": \"  \"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+    }
+
+    @Test
+    void assistantDownBecomes503() throws Exception {
+        mvc.perform(post("/portal/v1/assistant/questions")
+                        .header("X-Roles", "INSTITUTION").header("X-Org-Id", "org-2")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"question\": \"Posso doar iogurte?\"}"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(jsonPath("$.code").value("DEPENDENCY_UNAVAILABLE"));
     }
 
     @Test
