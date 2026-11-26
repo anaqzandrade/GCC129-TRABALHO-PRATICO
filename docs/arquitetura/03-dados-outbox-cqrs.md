@@ -364,7 +364,63 @@ Assim:
 
 ---
 
-## 17. Resumo
+## 17. Como foi implementado
+
+As seções anteriores registram o desenho. Esta mostra o que está no código, com os nomes reais.
+
+### Outbox no offer-service
+
+| Peça | Implementação |
+|---|---|
+| Tabela | `outbox_events` (migração `V2__create_outbox_events.sql`): `event_id`, `aggregate_id`, `event_type`, `routing_key`, `payload` (o JSON exato que vai para o RabbitMQ), `status`, `attempt_count`, `created_at`, `published_at` |
+| Gravação | `OfferOutbox`, com `Propagation.MANDATORY`: só roda dentro da transação que altera `offers`. A oferta e o evento são gravados juntos ou nenhum dos dois |
+| Publicação | `OutboxPublisher`, a cada 1 s (`OUTBOX_INTERVAL_MS`), lê até 50 linhas `PENDING` com `SELECT ... FOR UPDATE SKIP LOCKED`: réplicas do offer-service não publicam a mesma linha |
+| Confirmação | `publisher-confirm-type: simple`: a linha só vira `PUBLISHED` depois que o RabbitMQ confirma o recebimento |
+| Broker fora | Erro de conexão não conta tentativa: a linha continua `PENDING` e sai quando o RabbitMQ volta. Outros erros contam; depois de 10, a linha fica `FAILED` |
+
+Exchange `ravita.events` (topic). Eventos e routing keys:
+
+| Evento | Routing key | Quando |
+|---|---|---|
+| `OfferCreated` | `offer.created` | oferta criada |
+| `OfferReserved` | `offer.reserved` | reserva confirmada na SAGA |
+| `OfferReleased` | `offer.released` | compensação da SAGA: a reserva foi liberada |
+| `OfferExpired` | `offer.expired` | a janela de disponibilidade terminou |
+
+Cada mensagem leva `eventId`, `eventType`, `occurredAt`, `aggregateId` e, em `data`, o estado da oferta com
+`aggregateVersion`.
+
+### Consumidores idempotentes
+
+| Consumidor | Fila | Idempotência |
+|---|---|---|
+| demand-matching (`OfferEventConsumer`) | `matching-service.offer-events-queue` | Tabela `processed_events`: o `eventId` é gravado na mesma transação que atualiza `available_offers`; um evento repetido é ignorado |
+| Projeção do offer-service (`OfferProjectionConsumer`) | `offer-service.read-model-queue` (`offer.#`) | Tabela `read_model_processed_events` e a versão da oferta: evento com `aggregateVersion` menor ou igual ao já aplicado é ignorado, o que também resolve eventos fora de ordem |
+
+Os dois consumidores tentam 3 vezes; um evento que falha nas três é descartado e registrado no log.
+
+### CQRS no offer-service
+
+| Lado | Onde |
+|---|---|
+| Comandos | `POST /api/v1/offers` e as reservas gravam em `offers` (modelo de escrita), com validação de estado e versão otimista |
+| Projeção | `available_offers_read` (migração `V3__create_offer_read_model.sql`): oferta desnormalizada, com `donor_name` vindo do organization-service no `OfferCreated`, `city_normalized` para busca sem acento, `version`, `last_event_type`, `event_occurred_at` e `projected_at` |
+| Consulta | `GET /api/v1/offers/available?category=&city=&page=&size=` (`AvailableOfferQueryService`): lê só a projeção, filtra por `status = 'AVAILABLE'` e ordena por `available_until` |
+
+`event_occurred_at` e `projected_at` mostram a defasagem real entre a escrita e a leitura; nos testes ela fica
+abaixo de 2 s, dentro dos 5 s definidos na seção 15. O Portal BFF usa essa consulta em `GET /portal/v1/offers`, e o
+assistente de doação, na tool `buscar_ofertas_disponiveis` (doc 07).
+
+A reserva continua validando o modelo de escrita (seção 16): uma oferta que ainda aparece na leitura, mas já foi
+reservada, é recusada com `409 OFFER_NOT_AVAILABLE`.
+
+**Como demonstrar.** `scripts/verificacao.ps1`, seção 6, para o RabbitMQ, cria uma oferta pelo Portal, mostra a
+linha `PENDING` em `outbox_events` e a oferta fora da leitura; religa o RabbitMQ e mostra a linha `PUBLISHED`, a
+oferta na leitura e no demand-matching.
+
+---
+
+## 18. Resumo
 
 A estratégia de dados utiliza:
 

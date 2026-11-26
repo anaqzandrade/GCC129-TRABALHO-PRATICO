@@ -18,6 +18,21 @@ spring:
     open-in-view: false
   flyway:
     enabled: true
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    # O RabbitMQ confirma cada mensagem recebida; só depois disso a linha do outbox vira PUBLISHED.
+    publisher-confirm-type: simple
+    # Consumidor do modelo de leitura: um evento que falha 3 vezes seguidas é descartado e fica
+    # registrado no log, em vez de voltar para a fila para sempre.
+    listener:
+      simple:
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 1s
   jackson:
     # Contrato: campos desconhecidos na entrada retornam 400.
     deserialization:
@@ -37,6 +52,14 @@ ravita:
   expiration:
     # Intervalo (ms) do job que marca ofertas vencidas como EXPIRED.
     interval-ms: ${OFFER_EXPIRATION_INTERVAL_MS:60000}
+  rabbitmq:
+    exchange: ${RABBITMQ_EXCHANGE:ravita.events}
+  outbox:
+    # A cada intervalo o OutboxPublisher publica até batch-size eventos PENDING.
+    interval-ms: ${OUTBOX_INTERVAL_MS:1000}
+    batch-size: 50
+    # Erros que não são de conexão; depois disso a linha fica FAILED.
+    max-attempts: 10
 
 management:
   endpoints:
@@ -47,6 +70,11 @@ management:
     health:
       probes:
         enabled: true
+  health:
+    # O offer continua atendendo com o RabbitMQ fora do ar: os eventos esperam no outbox.
+    # Por isso o RabbitMQ não entra no health (nem no healthcheck do compose) deste serviço.
+    rabbit:
+      enabled: false
 
 logging:
   pattern:

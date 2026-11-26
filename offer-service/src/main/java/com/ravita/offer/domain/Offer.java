@@ -125,6 +125,19 @@ public class Offer {
         this.updatedAt = now;
     }
 
+    /**
+     * ExpireOffer: só vence uma oferta disponível cuja janela já terminou.
+     * Devolve false quando não há nada a fazer (outra réplica ou uma reserva mudou a oferta antes).
+     */
+    public boolean markExpired(Instant now) {
+        if (status != OfferStatus.AVAILABLE || !isExpiredAt(now)) {
+            return false;
+        }
+        this.status = OfferStatus.EXPIRED;
+        this.updatedAt = now;
+        return true;
+    }
+
     /** "São João del-Rei " → "sao joao del-rei", para o filtro por cidade ignorar acento e caixa. */
     public static String normalizeCity(String city) {
         if (city == null) {

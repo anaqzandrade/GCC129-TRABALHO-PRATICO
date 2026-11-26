@@ -1,0 +1,1643 @@
+{
+  "info": {
+    "name": "Ravita - Serviços diretos",
+    "description": "Chamadas direto aos serviços (portas 8080 a 8084), sem gateway nem BFF. Inclui o modelo de leitura do CQRS, o matching alimentado pelo outbox e as listagens em /api/v1. Rode as pastas em ordem: os ids criados em uma requisição ficam guardados nas variáveis da coleção e são usados nas seguintes. No Runner, rode as pastas 4 a 10 e deixe de fora as pastas Extra.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "4. Cadastros (organization)",
+      "item": [
+        {
+          "name": "Cadastrar doador",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{orgUrl}}/api/v1/organizations",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Mercado Central\",\n  \"type\": \"DONOR\",\n  \"document\": \"{{docDoador}}\",\n  \"address\": {\n    \"street\": \"Rua Central\",\n    \"number\": \"100\",\n    \"district\": \"Centro\",\n    \"city\": \"Lavras\",\n    \"state\": \"MG\",\n    \"postalCode\": \"37200000\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// documento aleatório de 14 dígitos: a coleção pode rodar várias vezes sem dar 409",
+                  "pm.collectionVariables.set(\"docDoador\", String(Math.floor(Math.random() * 1e14)).padStart(14, \"0\"));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+                  "const org = pm.response.json();",
+                  "pm.test(\"doador ativo\", () => pm.expect(org.active).to.eql(true));",
+                  "pm.collectionVariables.set(\"doadorId\", org.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cadastrar instituição",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{orgUrl}}/api/v1/organizations",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Casa de Acolhida Esperança\",\n  \"type\": \"INSTITUTION\",\n  \"document\": \"{{docInstituicao}}\",\n  \"address\": {\n    \"street\": \"Rua das Flores\",\n    \"number\": \"50\",\n    \"district\": \"Centro\",\n    \"city\": \"Lavras\",\n    \"state\": \"MG\",\n    \"postalCode\": \"37200000\"\n  },\n  \"receivingCapacity\": [\n    {\n      \"foodCategory\": \"VEGETABLES\",\n      \"maxQuantity\": 50,\n      \"unit\": \"KG\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// documento aleatório de 14 dígitos: a coleção pode rodar várias vezes sem dar 409",
+                  "pm.collectionVariables.set(\"docInstituicao\", String(Math.floor(Math.random() * 1e14)).padStart(14, \"0\"));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"instituicaoId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Consultar doador",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{orgUrl}}/api/v1/organizations/{{doadorId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar instituições",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{orgUrl}}/api/v1/organizations?type=INSTITUTION"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"só instituições\", () => pm.response.json().content.forEach(o => pm.expect(o.type).to.eql(\"INSTITUTION\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Erro: documento repetido",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{orgUrl}}/api/v1/organizations",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Mercado Central\",\n  \"type\": \"DONOR\",\n  \"document\": \"{{docDoador}}\",\n  \"address\": {\n    \"street\": \"Rua Central\",\n    \"number\": \"100\",\n    \"district\": \"Centro\",\n    \"city\": \"Lavras\",\n    \"state\": \"MG\",\n    \"postalCode\": \"37200000\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"409 DOCUMENT_ALREADY_REGISTERED\", () => {",
+                  "    pm.response.to.have.status(409);",
+                  "    pm.expect(pm.response.json().code).to.eql(\"DOCUMENT_ALREADY_REGISTERED\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Erro: instituição sem capacidade",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{orgUrl}}/api/v1/organizations",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Instituição sem capacidade\",\n  \"type\": \"INSTITUTION\",\n  \"document\": \"{{docSemCapacidade}}\",\n  \"address\": {\n    \"street\": \"Rua Central\",\n    \"number\": \"100\",\n    \"district\": \"Centro\",\n    \"city\": \"Lavras\",\n    \"state\": \"MG\",\n    \"postalCode\": \"37200000\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// documento aleatório de 14 dígitos: a coleção pode rodar várias vezes sem dar 409",
+                  "pm.collectionVariables.set(\"docSemCapacidade\", String(Math.floor(Math.random() * 1e14)).padStart(14, \"0\"));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"422 INVALID_ORGANIZATION\", () => {",
+                  "    pm.response.to.have.status(422);",
+                  "    pm.expect(pm.response.json().code).to.eql(\"INVALID_ORGANIZATION\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5. Ofertas (offer)",
+      "item": [
+        {
+          "name": "Criar oferta (consulta o organization)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{offerUrl}}/api/v1/offers",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"donorId\": \"{{doadorId}}\",\n  \"foodCategory\": \"VEGETABLES\",\n  \"description\": \"Hortaliças variadas\",\n  \"quantity\": 30,\n  \"unit\": \"KG\",\n  \"availableFrom\": \"{{inicio}}\",\n  \"availableUntil\": \"{{fim}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// janela da oferta: começa agora e termina daqui a 6 horas, no fuso deste computador",
+                  "const pad = n => String(n).padStart(2, \"0\");",
+                  "const iso = d => {",
+                  "    const off = -d.getTimezoneOffset(), a = Math.abs(off);",
+                  "    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}${off >= 0 ? \"+\" : \"-\"}${pad(Math.floor(a / 60))}:${pad(a % 60)}`;",
+                  "};",
+                  "const agora = new Date();",
+                  "pm.collectionVariables.set(\"inicio\", iso(agora));",
+                  "pm.collectionVariables.set(\"fim\", iso(new Date(agora.getTime() + 6 * 3600 * 1000)));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+                  "const oferta = pm.response.json();",
+                  "pm.test(\"status AVAILABLE\", () => pm.expect(oferta.status).to.eql(\"AVAILABLE\"));",
+                  "pm.test(\"endereço copiado do doador\", () => pm.expect(oferta.pickupAddress.street).to.eql(\"Rua Central\"));",
+                  "pm.test(\"ETag v0\", () => pm.expect(pm.response.headers.get(\"ETag\")).to.eql('\"v0\"'));",
+                  "pm.collectionVariables.set(\"ofertaId\", oferta.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Criar oferta com endereço próprio",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{offerUrl}}/api/v1/offers",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"donorId\": \"{{doadorId}}\",\n  \"foodCategory\": \"FRUITS\",\n  \"description\": \"Bananas e maçãs\",\n  \"quantity\": 12.5,\n  \"unit\": \"KG\",\n  \"pickupAddress\": {\n    \"street\": \"Avenida Tiradentes\",\n    \"number\": \"800\",\n    \"district\": \"Centro\",\n    \"city\": \"São João del-Rei\",\n    \"state\": \"MG\",\n    \"postalCode\": \"36300000\"\n  },\n  \"availableFrom\": \"{{inicio}}\",\n  \"availableUntil\": \"{{fim}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ofertas disponíveis no modelo de leitura (CQRS)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{offerUrl}}/api/v1/offers/available",
+            "description": "Lê só a tabela available_offers_read, atualizada pelos eventos do outbox. eventOccurredAt e projectedAt mostram a defasagem."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// dá tempo para o outbox publicar e a projeção aplicar o evento (cerca de 1 s)",
+                  "setTimeout(() => {}, 2000);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "const item = pm.response.json().items.find(o => o.id === pm.collectionVariables.get(\"ofertaId\"));",
+                  "pm.test(\"a oferta criada aparece na leitura\", () => pm.expect(item).to.be.an(\"object\"));",
+                  "pm.test(\"veio do evento OfferCreated\", () => pm.expect(item.lastEvent).to.eql(\"OfferCreated\"));",
+                  "pm.test(\"nome do doador desnormalizado\", () => pm.expect(item.donorName).to.be.a(\"string\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar ofertas disponíveis",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{offerUrl}}/api/v1/offers?status=AVAILABLE"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"formato {items, page, size, total}\", () => pm.expect(pm.response.json()).to.have.keys(\"items\", \"page\", \"size\", \"total\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Buscar por cidade (sem acento e sem maiúsculas)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{offerUrl}}/api/v1/offers?city=sao%20joao%20del-rei"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"só ofertas de São João del-Rei\", () => pm.response.json().items.forEach(o => pm.expect(o.city).to.eql(\"São João del-Rei\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Consultar oferta (ETag e links HATEOAS)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{offerUrl}}/api/v1/offers/{{ofertaId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "const oferta = pm.response.json();",
+                  "pm.test(\"tem ETag\", () => pm.expect(pm.response.headers.get(\"ETag\")).to.match(/^\"v\\d+\"$/));",
+                  "pm.test(\"links self, donor e reserve\", () => pm.expect(oferta._links).to.include.keys(\"self\", \"donor\", \"reserve\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Estatísticas por status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{offerUrl}}/api/v1/offers/statistics"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Erro: quantidade fracionada em UNIT",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{offerUrl}}/api/v1/offers",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"donorId\": \"{{doadorId}}\",\n  \"foodCategory\": \"BAKERY\",\n  \"description\": \"Pães\",\n  \"quantity\": 2.5,\n  \"unit\": \"UNIT\",\n  \"availableFrom\": \"{{inicio}}\",\n  \"availableUntil\": \"{{fim}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"422 INVALID_QUANTITY\", () => {",
+                  "    pm.response.to.have.status(422);",
+                  "    pm.expect(pm.response.json().code).to.eql(\"INVALID_QUANTITY\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Erro: campo desconhecido",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{offerUrl}}/api/v1/offers",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"donorId\": \"{{doadorId}}\",\n  \"foodCategory\": \"BAKERY\",\n  \"description\": \"Pães\",\n  \"quantity\": 10,\n  \"unit\": \"UNIT\",\n  \"availableFrom\": \"{{inicio}}\",\n  \"availableUntil\": \"{{fim}}\",\n  \"preco\": 5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 INVALID_REQUEST\", () => {",
+                  "    pm.response.to.have.status(400);",
+                  "    pm.expect(pm.response.json().code).to.eql(\"INVALID_REQUEST\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Erro: filtro desconhecido",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{offerUrl}}/api/v1/offers?cor=azul"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 INVALID_REQUEST\", () => {",
+                  "    pm.response.to.have.status(400);",
+                  "    pm.expect(pm.response.json().code).to.eql(\"INVALID_REQUEST\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6. Falhas entre serviços",
+      "item": [
+        {
+          "name": "Desativar doador",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{orgUrl}}/api/v1/organizations/{{doadorId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"active\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"doador inativo\", () => pm.expect(pm.response.json().active).to.eql(false));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Erro: oferta com doador inativo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{offerUrl}}/api/v1/offers",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"donorId\": \"{{doadorId}}\",\n  \"foodCategory\": \"DAIRY\",\n  \"description\": \"Iogurte\",\n  \"quantity\": 20,\n  \"unit\": \"UNIT\",\n  \"availableFrom\": \"{{inicio}}\",\n  \"availableUntil\": \"{{fim}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"422 INVALID_DONOR\", () => {",
+                  "    pm.response.to.have.status(422);",
+                  "    pm.expect(pm.response.json().code).to.eql(\"INVALID_DONOR\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reativar doador",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{orgUrl}}/api/v1/organizations/{{doadorId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"active\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"doador ativo\", () => pm.expect(pm.response.json().active).to.eql(true));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "7. Reserva e compensação (offer)",
+      "item": [
+        {
+          "name": "Reservar oferta",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{offerUrl}}/api/v1/offers/{{ofertaId}}/reservations",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"redistributionId\": \"{{redistribuicaoDemo}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// id de redistribuição novo a cada execução da coleção",
+                  "pm.collectionVariables.set(\"redistribuicaoDemo\", \"red-\" + Date.now());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+                  "const reserva = pm.response.json();",
+                  "pm.test(\"reserva ACTIVE\", () => pm.expect(reserva.status).to.eql(\"ACTIVE\"));",
+                  "pm.collectionVariables.set(\"reservaId\", reserva.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Repetir a mesma reserva (idempotente)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{offerUrl}}/api/v1/offers/{{ofertaId}}/reservations",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"redistributionId\": \"{{redistribuicaoDemo}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"devolve a mesma reserva\", () => pm.expect(pm.response.json().id).to.eql(pm.collectionVariables.get(\"reservaId\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Erro: outra redistribuição",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{offerUrl}}/api/v1/offers/{{ofertaId}}/reservations",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"redistributionId\": \"{{redistribuicaoDemo}}-outra\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"409 OFFER_NOT_AVAILABLE\", () => {",
+                  "    pm.response.to.have.status(409);",
+                  "    pm.expect(pm.response.json().code).to.eql(\"OFFER_NOT_AVAILABLE\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Oferta reservada",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{offerUrl}}/api/v1/offers/{{ofertaId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "const oferta = pm.response.json();",
+                  "pm.test(\"status RESERVED\", () => pm.expect(oferta.status).to.eql(\"RESERVED\"));",
+                  "pm.test(\"sem o link reserve\", () => pm.expect(oferta._links).to.not.have.property(\"reserve\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Liberar reserva (compensação)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{offerUrl}}/api/v1/offers/{{ofertaId}}/reservations/{{reservaId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"204 No Content\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Liberar de novo (idempotente)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{offerUrl}}/api/v1/offers/{{ofertaId}}/reservations/{{reservaId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"204 No Content\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reserva liberada",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{offerUrl}}/api/v1/offers/{{ofertaId}}/reservations/{{reservaId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"reserva RELEASED\", () => pm.expect(pm.response.json().status).to.eql(\"RELEASED\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Oferta disponível de novo",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{offerUrl}}/api/v1/offers/{{ofertaId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"status AVAILABLE\", () => pm.expect(pm.response.json().status).to.eql(\"AVAILABLE\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "8. Demanda e matching (eventos pelo outbox)",
+      "description": "O offer-service publica OfferCreated pelo outbox; o demand-matching consome e calcula os matches. Nada é publicado à mão.",
+      "item": [
+        {
+          "name": "Registrar demanda",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{matchUrl}}/api/v1/demands",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"institutionId\": \"{{instituicaoId}}\",\n  \"foodCategory\": \"VEGETABLES\",\n  \"desiredQuantity\": 20,\n  \"unit\": \"KG\",\n  \"city\": \"Lavras\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"demandaId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Consultar demanda",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{matchUrl}}/api/v1/demands/{{demandaId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Matches (a oferta chegou pelo outbox)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{matchUrl}}/api/v1/demands/{{demandaId}}/matches"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// dá tempo para o matching consumir o evento da fila",
+                  "setTimeout(() => {}, 1500);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"a oferta aparece como compatível\", () => pm.expect(pm.response.json().matches).to.deep.include({ offerId: pm.collectionVariables.get(\"ofertaId\"), compatibility: \"HIGH\" }));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "9. Logística e eventos (logistics)",
+      "item": [
+        {
+          "name": "Criar operação logística",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{logUrl}}/api/v1/logistics",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"redistributionId\": \"{{$guid}}\",\n  \"offerId\": \"{{$guid}}\",\n  \"pickupAddress\": \"Rua Central, 100 - Lavras\",\n  \"deliveryAddress\": \"Rua das Flores, 50 - Lavras\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+                  "const op = pm.response.json();",
+                  "pm.test(\"status SCHEDULED\", () => pm.expect(op.status).to.eql(\"SCHEDULED\"));",
+                  "pm.collectionVariables.set(\"logisticaId\", op.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Consultar operação",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{logUrl}}/api/v1/logistics/{{logisticaId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Coletar (publica logistics.food.collected)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{logUrl}}/api/v1/logistics/{{logisticaId}}/collect"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"status COLLECTED\", () => pm.expect(pm.response.json().status).to.eql(\"COLLECTED\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Entregar (publica logistics.food.delivered)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{logUrl}}/api/v1/logistics/{{logisticaId}}/deliver"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"status DELIVERED\", () => pm.expect(pm.response.json().status).to.eql(\"DELIVERED\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Erro: coletar depois da entrega",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{logUrl}}/api/v1/logistics/{{logisticaId}}/collect"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"409 Conflict\", () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar operações entregues",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{logUrl}}/api/v1/logistics?status=DELIVERED"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "const pagina = pm.response.json();",
+                  "pm.test(\"formato {items, page, size, total}\", () => pm.expect(pagina).to.have.keys(\"items\", \"page\", \"size\", \"total\"));",
+                  "pm.test(\"inclui a operação entregue\", () => pm.expect(pagina.items.map(o => o.id)).to.include(pm.collectionVariables.get(\"logisticaId\")));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "10. SAGA de redistribuição (redistribution)",
+      "description": "O redistribution-service orquestra a SAGA: T1 cria a redistribuição, T2 reserva a oferta no offer-service, T3 cria a operação no logistics-service. Os eventos de coleta e entrega do logistics levam a redistribuição a IN_TRANSIT e COMPLETED.",
+      "item": [
+        {
+          "name": "Iniciar redistribuição (T1, T2 e T3)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{redUrl}}/api/v1/redistributions",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"offerId\": \"{{ofertaId}}\",\n  \"institutionId\": \"{{instituicaoId}}\",\n  \"pickupAddress\": \"Rua Central, 100 - Lavras\",\n  \"deliveryAddress\": \"Rua das Flores, 50 - Lavras\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+                  "const red = pm.response.json();",
+                  "pm.test(\"status LOGISTICS_PENDING\", () => pm.expect(red.status).to.eql(\"LOGISTICS_PENDING\"));",
+                  "pm.test(\"reserva e operação logística criadas\", () => { pm.expect(red.reservationId).to.be.a(\"string\"); pm.expect(red.logisticsId).to.be.a(\"string\"); });",
+                  "pm.collectionVariables.set(\"sagaId\", red.id);",
+                  "pm.collectionVariables.set(\"sagaReservaId\", red.reservationId);",
+                  "pm.collectionVariables.set(\"sagaLogisticaId\", red.logisticsId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Oferta reservada pela SAGA",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{offerUrl}}/api/v1/offers/{{ofertaId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"status RESERVED\", () => pm.expect(pm.response.json().status).to.eql(\"RESERVED\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reserva criada pela SAGA",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{offerUrl}}/api/v1/offers/{{ofertaId}}/reservations/{{sagaReservaId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "const reserva = pm.response.json();",
+                  "pm.test(\"reserva ACTIVE\", () => pm.expect(reserva.status).to.eql(\"ACTIVE\"));",
+                  "pm.test(\"ligada a esta redistribuição\", () => pm.expect(reserva.redistributionId).to.eql(pm.collectionVariables.get(\"sagaId\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Segunda redistribuição da mesma oferta",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{redUrl}}/api/v1/redistributions",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"offerId\": \"{{ofertaId}}\",\n  \"institutionId\": \"{{instituicaoId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+                  "const red = pm.response.json();",
+                  "pm.test(\"termina FAILED\", () => pm.expect(red.status).to.eql(\"FAILED\"));",
+                  "pm.test(\"motivo: oferta já reservada\", () => pm.expect(red.failureReason).to.include(\"OFFER_NOT_AVAILABLE\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Coletar (evento logistics.food.collected)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{logUrl}}/api/v1/logistics/{{sagaLogisticaId}}/collect"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"status COLLECTED\", () => pm.expect(pm.response.json().status).to.eql(\"COLLECTED\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Redistribuição em trânsito",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{redUrl}}/api/v1/redistributions/{{sagaId}}"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// dá tempo para o redistribution consumir o evento do logistics",
+                  "setTimeout(() => {}, 1500);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"status IN_TRANSIT\", () => pm.expect(pm.response.json().status).to.eql(\"IN_TRANSIT\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Entregar (evento logistics.food.delivered)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{logUrl}}/api/v1/logistics/{{sagaLogisticaId}}/deliver"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"status DELIVERED\", () => pm.expect(pm.response.json().status).to.eql(\"DELIVERED\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Redistribuição concluída",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{redUrl}}/api/v1/redistributions/{{sagaId}}"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// dá tempo para o redistribution consumir o evento do logistics",
+                  "setTimeout(() => {}, 1500);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "const red = pm.response.json();",
+                  "pm.test(\"status COMPLETED\", () => pm.expect(red.status).to.eql(\"COMPLETED\"));",
+                  "pm.test(\"último evento FoodDelivered\", () => pm.expect(red.lastEvent).to.eql(\"FoodDelivered\"));",
+                  "pm.test(\"tem correlationId\", () => pm.expect(red.correlationId).to.be.a(\"string\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar redistribuições concluídas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{redUrl}}/api/v1/redistributions?status=COMPLETED"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"inclui a redistribuição concluída\", () => pm.expect(pm.response.json().items.map(r => r.id)).to.include(pm.collectionVariables.get(\"sagaId\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Estatísticas por status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{redUrl}}/api/v1/redistributions/statistics"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "const stats = pm.response.json();",
+                  "pm.test(\"ao menos uma COMPLETED e uma FAILED\", () => { pm.expect(stats.byStatus.COMPLETED).to.be.at.least(1); pm.expect(stats.byStatus.FAILED).to.be.at.least(1); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Erro: cancelar depois da entrega",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{redUrl}}/api/v1/redistributions/{{sagaId}}/cancel"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"409 Conflict\", () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Extra A (manual): organization parado",
+      "description": "Não rode no Runner. Antes: docker compose stop organization-service. Depois: docker compose start organization-service.",
+      "item": [
+        {
+          "name": "Erro: oferta com o organization parado",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{offerUrl}}/api/v1/offers",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"donorId\": \"{{doadorId}}\",\n  \"foodCategory\": \"DAIRY\",\n  \"description\": \"Iogurte\",\n  \"quantity\": 20,\n  \"unit\": \"UNIT\",\n  \"availableFrom\": \"{{inicio}}\",\n  \"availableUntil\": \"{{fim}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"503 ou 504: dependência indisponível\", () => pm.expect(pm.response.code).to.be.oneOf([503, 504]));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Extra B (manual): SAGA com o logistics parado",
+      "description": "Não rode no Runner. Antes da segunda requisição: docker compose stop logistics-service. Depois: docker compose start logistics-service. T2 reserva a oferta, T3 falha e a compensação libera a reserva.",
+      "item": [
+        {
+          "name": "Criar oferta para o cenário de falha",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{offerUrl}}/api/v1/offers",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"donorId\": \"{{doadorId}}\",\n  \"foodCategory\": \"GRAINS\",\n  \"description\": \"Arroz e feijão\",\n  \"quantity\": 40,\n  \"unit\": \"KG\",\n  \"availableFrom\": \"{{inicio}}\",\n  \"availableUntil\": \"{{fim}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// janela da oferta: começa agora e termina daqui a 6 horas, no fuso deste computador",
+                  "const pad = n => String(n).padStart(2, \"0\");",
+                  "const iso = d => {",
+                  "    const off = -d.getTimezoneOffset(), a = Math.abs(off);",
+                  "    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}${off >= 0 ? \"+\" : \"-\"}${pad(Math.floor(a / 60))}:${pad(a % 60)}`;",
+                  "};",
+                  "const agora = new Date();",
+                  "pm.collectionVariables.set(\"inicio\", iso(agora));",
+                  "pm.collectionVariables.set(\"fim\", iso(new Date(agora.getTime() + 6 * 3600 * 1000)));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"ofertaFalhaId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Iniciar redistribuição com o logistics parado",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{redUrl}}/api/v1/redistributions",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"offerId\": \"{{ofertaFalhaId}}\",\n  \"institutionId\": \"{{instituicaoId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+                  "const red = pm.response.json();",
+                  "pm.test(\"termina FAILED\", () => pm.expect(red.status).to.eql(\"FAILED\"));",
+                  "pm.test(\"compensação executada\", () => pm.expect(red.failureReason).to.include(\"compensação executada\"));",
+                  "pm.test(\"último evento ReservationReleased\", () => pm.expect(red.lastEvent).to.eql(\"ReservationReleased\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Oferta liberada pela compensação",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{offerUrl}}/api/v1/offers/{{ofertaFalhaId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"status AVAILABLE de novo\", () => pm.expect(pm.response.json().status).to.eql(\"AVAILABLE\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "orgUrl",
+      "value": "http://localhost:8081",
+      "type": "string"
+    },
+    {
+      "key": "offerUrl",
+      "value": "http://localhost:8082",
+      "type": "string"
+    },
+    {
+      "key": "matchUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "redUrl",
+      "value": "http://localhost:8083",
+      "type": "string"
+    },
+    {
+      "key": "logUrl",
+      "value": "http://localhost:8084",
+      "type": "string"
+    },
+    {
+      "key": "rabbitUrl",
+      "value": "http://localhost:15672",
+      "type": "string"
+    },
+    {
+      "key": "doadorId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "instituicaoId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "ofertaId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "reservaId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "demandaId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "logisticaId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "redistribuicaoId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "sagaId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "sagaReservaId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "sagaLogisticaId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "ofertaFalhaId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "inicio",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "fim",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "docDoador",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "docInstituicao",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "docSemCapacidade",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "redistribuicaoDemo",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}

@@ -4,12 +4,16 @@
 #   Parar:         docker compose down       (mantém os dados nos volumes)
 #   Apagar dados:  docker compose down -v
 #
+# Páginas: http://localhost:8000/app/portal/ e http://localhost:8000/app/admin/
+#
 # Redes:
-#   services           serviços de domínio + RabbitMQ (comunicação entre serviços)
+#   bff                API Gateway + BFFs + páginas (web): o gateway não alcança os serviços de domínio
+#   services           BFFs + serviços de domínio + assistente + RabbitMQ
 #   <serviço>-data     rede interna de cada banco: só o próprio serviço enxerga o seu banco
 #
-# Os bancos não publicam porta no host. As portas dos serviços estão publicadas para testes
-# enquanto o API Gateway não existe (Parte 4); depois, só o gateway ficará exposto.
+# Só o API Gateway publica porta no host (8000). Para depurar ou usar a coleção "Serviços diretos"
+# do Postman, publique as outras portas com:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 # Usuários e senhas têm valores padrão; para trocar, copie .env.example para .env.
 name: ravita
 
@@ -34,6 +38,16 @@ x-rabbit-env: &rabbit-env
   RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-ravita}
   RABBITMQ_EXCHANGE: ravita.events
 
+# healthcheck dos 5 serviços: /actuator/health responde UP só quando a aplicação subiu
+# e o banco dela (e o RabbitMQ, nos que usam mensageria) responde.
+# O $$ escapa o $: o ${SERVER_PORT} é lido dentro do container, então o mesmo bloco serve para todos.
+x-spring-healthcheck: &spring-healthcheck
+  test: ["CMD-SHELL", "wget -qO- http://localhost:$${SERVER_PORT}/actuator/health > /dev/null || exit 1"]
+  interval: 10s
+  timeout: 3s
+  start_period: 40s
+  retries: 5
+
 services:
 
   # ---------------------------------------------------------------- mensageria
@@ -48,8 +62,6 @@ services:
       - rabbitmq-data:/var/lib/rabbitmq
     networks:
       - services
-    ports:
-      - "15672:15672"   # painel de administração
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
@@ -83,8 +95,7 @@ services:
     networks:
       - services
       - organization-data
-    ports:
-      - "8081:8081"
+    healthcheck: *spring-healthcheck
     restart: unless-stopped
 
   # ---------------------------------------------------------------- offer
@@ -102,6 +113,7 @@ services:
     build: ./offer-service
     image: ravita/offer-service:0.0.1
     environment:
+      <<: *rabbit-env
       SERVER_PORT: 8082
       DB_HOST: offer-db
       DB_PORT: 5432
@@ -114,19 +126,14 @@ services:
         condition: service_healthy
       organization-service:
         condition: service_started
+      # service_started, e não healthy: com o RabbitMQ fora do ar o offer funciona,
+      # e os eventos esperam no outbox até ele responder
+      rabbitmq:
+        condition: service_started
     networks:
       - services
       - offer-data
-    ports:
-      # para escalar, use docker-compose.scale.yml, que remove esta porta publicada
-      - "8082:8082"
-    healthcheck:
-      # /actuator/health inclui o banco: só fica healthy se o PostgreSQL responder
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8082/actuator/health > /dev/null || exit 1"]
-      interval: 10s
-      timeout: 3s
-      start_period: 40s
-      retries: 5
+    healthcheck: *spring-healthcheck
     restart: unless-stopped
 
   # ---------------------------------------------------------------- demand/matching
@@ -162,8 +169,7 @@ services:
     networks:
       - services
       - matching-data
-    ports:
-      - "8080:8080"
+    healthcheck: *spring-healthcheck
     restart: unless-stopped
 
   # ---------------------------------------------------------------- logistics
@@ -196,8 +202,7 @@ services:
     networks:
       - services
       - logistics-data
-    ports:
-      - "8084:8084"
+    healthcheck: *spring-healthcheck
     restart: unless-stopped
 
   # ---------------------------------------------------------------- redistribution (orquestrador da SAGA)
@@ -236,11 +241,151 @@ services:
     networks:
       - services
       - redistribution-data
+    healthcheck: *spring-healthcheck
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------- assistente de doação (LLM, doc 07)
+  assistant-db:
+    <<: *postgres
+    image: pgvector/pgvector:pg17   # PostgreSQL 17 com a extensão pgvector: a base vetorial do RAG
+    environment:
+      <<: *db-credentials
+      POSTGRES_DB: assistant_db
+    volumes:
+      - assistant-db-data:/var/lib/postgresql/data
+    networks:
+      - assistant-data
+
+  assistant-service:
+    build: ./assistant-service
+    image: ravita/assistant-service:0.0.1
+    environment:
+      SERVER_PORT: 8095
+      # a chave fica no .env (fora do git); sem ela, o serviço responde pelo fallback
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      GEMINI_CHAT_MODEL: ${GEMINI_CHAT_MODEL:-gemini-3.1-flash-lite}
+      GEMINI_EMBEDDING_MODEL: ${GEMINI_EMBEDDING_MODEL:-models/gemini-embedding-2}
+      DB_HOST: assistant-db
+      DB_PORT: 5432
+      DB_NAME: assistant_db
+      DB_USERNAME: ${POSTGRES_USER:-ravita}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-ravita}
+      OFFER_SERVICE_URL: http://offer-service:8082
+      ORGANIZATION_SERVICE_URL: http://organization-service:8081
+    depends_on:
+      assistant-db:
+        condition: service_healthy
+      offer-service:
+        condition: service_started
+      organization-service:
+        condition: service_started
+    networks:
+      - services         # recebe o Portal BFF, chama offer e organization e sai para a API do Gemini
+      - assistant-data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8095/health', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      start_period: 20s
+      retries: 5
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------- BFFs (só o gateway os alcança, pela rede bff)
+  portal-bff:
+    build: ./portal-bff
+    image: ravita/portal-bff:0.0.1
+    environment:
+      SERVER_PORT: 8091
+      OFFER_SERVICE_URL: http://offer-service:8082
+      ORGANIZATION_SERVICE_URL: http://organization-service:8081
+      MATCHING_SERVICE_URL: http://demand-matching-service:8080
+      REDISTRIBUTION_SERVICE_URL: http://redistribution-service:8083
+      LOGISTICS_SERVICE_URL: http://logistics-service:8084
+      ASSISTANT_SERVICE_URL: http://assistant-service:8095
+    depends_on:
+      offer-service:
+        condition: service_started
+      organization-service:
+        condition: service_started
+      assistant-service:
+        condition: service_started
+      demand-matching-service:
+        condition: service_started
+      redistribution-service:
+        condition: service_started
+      logistics-service:
+        condition: service_started
+    networks:
+      - bff        # recebe as requisições do gateway
+      - services   # chama os serviços de domínio
+    healthcheck: *spring-healthcheck
+    restart: unless-stopped
+
+  admin-bff:
+    build: ./admin-bff
+    image: ravita/admin-bff:0.0.1
+    environment:
+      SERVER_PORT: 8092
+      OFFER_SERVICE_URL: http://offer-service:8082
+      ORGANIZATION_SERVICE_URL: http://organization-service:8081
+      REDISTRIBUTION_SERVICE_URL: http://redistribution-service:8083
+      LOGISTICS_SERVICE_URL: http://logistics-service:8084
+    depends_on:
+      offer-service:
+        condition: service_started
+      organization-service:
+        condition: service_started
+      redistribution-service:
+        condition: service_started
+      logistics-service:
+        condition: service_started
+    networks:
+      - bff
+      - services
+    healthcheck: *spring-healthcheck
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------- clientes (páginas do portal e do admin)
+  web:
+    build: ./web
+    image: ravita/web:0.0.1
+    networks:
+      - bff          # só o gateway chega aqui, em /app/**
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------- API Gateway (única entrada externa)
+  api-gateway:
+    build: ./api-gateway
+    image: ravita/api-gateway:0.0.1
+    environment:
+      SERVER_PORT: 8000
+      JWT_SECRET: ${JWT_SECRET:-ravita-dev-secret-troque-no-env-2026}
+      PORTAL_BFF_URL: http://portal-bff:8091
+      ADMIN_BFF_URL: http://admin-bff:8092
+      WEB_URL: http://web:80
+    depends_on:
+      web:
+        condition: service_started
+      portal-bff:
+        condition: service_started
+      admin-bff:
+        condition: service_started
+    networks:
+      # só alcança os BFFs (rede bff), nunca os serviços de domínio
+      - bff
     ports:
-      - "8083:8083"
+      - "8000:8000"
+    healthcheck: *spring-healthcheck
     restart: unless-stopped
 
 networks:
+  # gateway e BFFs; os BFFs também ficam na rede services para chamar os serviços
+  bff:
   services:
   # internal: sem acesso de fora da rede; cada banco só é alcançável pelo próprio serviço
   organization-data:
@@ -253,6 +398,8 @@ networks:
     internal: true
   redistribution-data:
     internal: true
+  assistant-data:
+    internal: true
 
 volumes:
   rabbitmq-data:
@@ -261,3 +408,4 @@ volumes:
   matching-db-data:
   logistics-db-data:
   redistribution-db-data:
+  assistant-db-data:

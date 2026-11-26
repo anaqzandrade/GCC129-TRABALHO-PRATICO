@@ -24,3 +24,15 @@ ravita:
     logistics-url: ${LOGISTICS_SERVICE_URL:http://localhost:8084}
   rabbitmq:
     exchange: ${RABBITMQ_EXCHANGE:ravita.events}
+
+# /actuator/health para o healthcheck do docker-compose. O health inclui o banco
+# e, nos serviços com mensageria, o RabbitMQ.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true

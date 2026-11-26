@@ -1,0 +1,60 @@
+# Toda configuração vem de variáveis de ambiente; os valores depois de ":" servem para rodar sem Docker.
+server:
+  port: ${SERVER_PORT:8000}
+  shutdown: graceful
+
+spring:
+  application:
+    name: api-gateway
+  cloud:
+    gateway:
+      # a partir do Spring Cloud 2025.0 as propriedades do gateway WebFlux ficam neste prefixo
+      server:
+        webflux:
+          httpclient:
+            connect-timeout: 2000      # ms; BFF fora do ar vira 503 em até 2 s
+            response-timeout: 15s      # BFF que não responde vira 504
+          routes:
+            # doc 02, seção 11: o gateway só encaminha para os BFFs; /api/v1 dos serviços não é publicado
+            - id: portal-bff
+              uri: ${PORTAL_BFF_URL:http://localhost:8091}
+              predicates:
+                - Path=/portal/v1/**
+            - id: admin-bff
+              uri: ${ADMIN_BFF_URL:http://localhost:8092}
+              predicates:
+                - Path=/admin/v1/**
+            # os dois clientes (páginas estáticas no container web), na mesma origem da API: sem CORS
+            - id: web
+              uri: ${WEB_URL:http://localhost:8090}
+              predicates:
+                - Path=/app/**
+              filters:
+                - StripPrefix=1
+            - id: home
+              uri: no://op
+              predicates:
+                - Path=/
+              filters:
+                - RedirectTo=302, /app/portal/
+
+ravita:
+  jwt:
+    # chave HS256 dos tokens; troque no .env (JWT_SECRET). Precisa de pelo menos 32 caracteres.
+    secret: ${JWT_SECRET:ravita-dev-secret-troque-no-env-2026}
+    issuer: ravita-gateway
+    ttl: ${JWT_TTL:2h}
+  rate-limit:
+    # 20 requisições de rajada por cliente, recarregadas em 10 s (2 por segundo em regime)
+    capacity: ${RATE_LIMIT_CAPACITY:20}
+    refill-period: ${RATE_LIMIT_REFILL_PERIOD:10s}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true

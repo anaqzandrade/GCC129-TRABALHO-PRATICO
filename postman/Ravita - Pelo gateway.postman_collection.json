@@ -1,0 +1,1386 @@
+{
+  "info": {
+    "name": "Ravita - Pelo gateway",
+    "description": "Todas as chamadas passam pelo API Gateway (http://localhost:8000), como um cliente real: tokens, Portal BFF e Admin BFF. Os tokens e os ids ficam nas variáveis da coleção. No Runner, rode as pastas 1 a 5 e 8 (menos a requisição de fallback); as pastas 6 e 7 e o fallback pedem um passo manual, descrito em cada uma.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Autenticação",
+      "description": "O gateway emite e valida os tokens (JWT HS256). Sem token: 401. Papel errado: 403.",
+      "item": [
+        {
+          "name": "Token de ADMIN",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/token",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"ADMIN\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "const t = pm.response.json();",
+                  "pm.test(\"tokenType Bearer\", () => pm.expect(t.tokenType).to.eql(\"Bearer\"));",
+                  "pm.collectionVariables.set(\"adminToken\", t.accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Erro: papel inválido",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/token",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"HACKER\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 INVALID_ROLE\", () => {",
+                  "    pm.response.to.have.status(400);",
+                  "    pm.expect(pm.response.json().code).to.eql(\"INVALID_ROLE\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Erro: sem token",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/portal/v1/offers"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"401 UNAUTHENTICATED\", () => {",
+                  "    pm.response.to.have.status(401);",
+                  "    pm.expect(pm.response.json().code).to.eql(\"UNAUTHENTICATED\");",
+                  "});",
+                  "pm.test(\"correlation id na resposta\", () => pm.expect(pm.response.headers.get(\"X-Correlation-ID\")).to.be.a(\"string\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Erro: API dos serviços não é publicada",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/offers",
+            "description": "O gateway só encaminha /portal/v1 e /admin/v1. Qualquer outra rota é negada, mesmo com token."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"403 FORBIDDEN\", () => {",
+                  "    pm.response.to.have.status(403);",
+                  "    pm.expect(pm.response.json().code).to.eql(\"FORBIDDEN\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Admin (cadastros e painel)",
+      "item": [
+        {
+          "name": "Cadastrar doador",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/admin/v1/organizations",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Mercado Central\",\n  \"type\": \"DONOR\",\n  \"document\": \"{{docDoador}}\",\n  \"address\": {\n    \"street\": \"Rua Central\",\n    \"number\": \"100\",\n    \"district\": \"Centro\",\n    \"city\": \"Lavras\",\n    \"state\": \"MG\",\n    \"postalCode\": \"37200000\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set(\"docDoador\", String(Math.floor(Math.random() * 1e14)).padStart(14, \"0\"));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"doadorId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cadastrar instituição",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/admin/v1/organizations",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Casa de Acolhida Esperança\",\n  \"type\": \"INSTITUTION\",\n  \"document\": \"{{docInstituicao}}\",\n  \"address\": {\n    \"street\": \"Rua das Flores\",\n    \"number\": \"50\",\n    \"district\": \"Centro\",\n    \"city\": \"Lavras\",\n    \"state\": \"MG\",\n    \"postalCode\": \"37200000\"\n  },\n  \"receivingCapacity\": [\n    {\n      \"foodCategory\": \"VEGETABLES\",\n      \"maxQuantity\": 50,\n      \"unit\": \"KG\"\n    },\n    {\n      \"foodCategory\": \"DAIRY\",\n      \"maxQuantity\": 40,\n      \"unit\": \"L\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set(\"docInstituicao\", String(Math.floor(Math.random() * 1e14)).padStart(14, \"0\"));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"instituicaoId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Token do doador",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/token",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"DONOR\",\n  \"organizationId\": \"{{doadorId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set(\"doadorToken\", pm.response.json().accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Token da instituição",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/token",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"INSTITUTION\",\n  \"organizationId\": \"{{instituicaoId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set(\"instituicaoToken\", pm.response.json().accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Dashboard",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/admin/v1/dashboard",
+            "description": "Junta organization-service, offer-service e redistribution-service numa resposta."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json();",
+                  "pm.test(\"organizações, ofertas e redistribuições\", () => pm.expect(d).to.include.keys(\"organizations\", \"offers\", \"redistributions\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Organizações",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/admin/v1/organizations?size=20"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"formato {items, page, size, total}\", () => pm.expect(pm.response.json()).to.include.keys(\"items\", \"page\", \"size\", \"total\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Erro: doador no painel",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{doadorToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/admin/v1/dashboard"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"403 FORBIDDEN\", () => {",
+                  "    pm.response.to.have.status(403);",
+                  "    pm.expect(pm.response.json().code).to.eql(\"FORBIDDEN\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. Portal",
+      "item": [
+        {
+          "name": "Publicar oferta (doador)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{doadorToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/portal/v1/offers",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"foodCategory\": \"VEGETABLES\",\n  \"description\": \"Hortaliças variadas\",\n  \"quantity\": 30,\n  \"unit\": \"KG\",\n  \"availableFrom\": \"{{inicio}}\",\n  \"availableUntil\": \"{{fim}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const pad = n => String(n).padStart(2, \"0\");",
+                  "const iso = d => { const off = -d.getTimezoneOffset(), a = Math.abs(off);",
+                  "  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}${off >= 0 ? \"+\" : \"-\"}${pad(Math.floor(a / 60))}:${pad(a % 60)}`; };",
+                  "const agora = new Date();",
+                  "pm.collectionVariables.set(\"inicio\", iso(agora));",
+                  "pm.collectionVariables.set(\"fim\", iso(new Date(agora.getTime() + 6 * 3600 * 1000)));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+                  "const o = pm.response.json();",
+                  "pm.test(\"donorId vem do token\", () => pm.expect(o.donorId).to.eql(pm.collectionVariables.get(\"doadorId\")));",
+                  "pm.collectionVariables.set(\"ofertaId\", o.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Erro: instituição publicando oferta",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{instituicaoToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/portal/v1/offers",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"foodCategory\": \"VEGETABLES\",\n  \"description\": \"Pães\",\n  \"quantity\": 30,\n  \"unit\": \"KG\",\n  \"availableFrom\": \"{{inicio}}\",\n  \"availableUntil\": \"{{fim}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"403 FORBIDDEN\", () => {",
+                  "    pm.response.to.have.status(403);",
+                  "    pm.expect(pm.response.json().code).to.eql(\"FORBIDDEN\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Minhas ofertas (doador)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{doadorToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/portal/v1/my-offers"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"a oferta publicada está na lista\", () => pm.expect(pm.response.json().items.map(o => o.id)).to.include(pm.collectionVariables.get(\"ofertaId\")));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Detalhe da oferta",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{instituicaoToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/portal/v1/offers/{{ofertaId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"link para iniciar a redistribuição\", () => pm.expect(pm.response.json()._links).to.have.property(\"start-redistribution\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Registrar demanda (instituição)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{instituicaoToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/portal/v1/demands",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"foodCategory\": \"VEGETABLES\",\n  \"desiredQuantity\": 20,\n  \"unit\": \"KG\",\n  \"city\": \"Lavras\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"demandaId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ofertas compatíveis com a demanda",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{instituicaoToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/portal/v1/demands/{{demandaId}}/matches"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. CQRS",
+      "description": "GET /portal/v1/offers lê a tabela available_offers_read, atualizada pelos eventos do outbox.",
+      "item": [
+        {
+          "name": "Oferta no modelo de leitura",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{instituicaoToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/portal/v1/offers?category=VEGETABLES&size=100"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// dá tempo para o outbox publicar e a projeção aplicar o evento",
+                  "setTimeout(() => {}, 2000);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "const oferta = pm.response.json().items.find(o => o.id === pm.collectionVariables.get(\"ofertaId\"));",
+                  "pm.test(\"a oferta criada aparece na leitura\", () => pm.expect(oferta).to.be.an(\"object\"));",
+                  "pm.test(\"o Portal esconde os campos internos da projeção\", () => pm.expect(oferta).to.not.have.property(\"lastEvent\"));",
+                  "pm.test(\"nome do doador desnormalizado\", () => pm.expect(oferta.donorName).to.eql(\"Mercado Central\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5. SAGA (caminho feliz)",
+      "item": [
+        {
+          "name": "Iniciar redistribuição (instituição)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{instituicaoToken}}"
+              },
+              {
+                "key": "X-Correlation-ID",
+                "value": "postman-saga-ok"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/portal/v1/redistributions",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"offerId\": \"{{ofertaId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "O Portal BFF monta o pedido da SAGA: endereço de coleta da oferta e de entrega da instituição."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"coleta agendada\", () => pm.expect(r.status).to.eql(\"LOGISTICS_PENDING\"));",
+                  "pm.collectionVariables.set(\"redistribuicaoId\", r.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Acompanhar no Portal",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{instituicaoToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/portal/v1/redistributions/{{redistribuicaoId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"sem dados internos da SAGA\", () => pm.expect(r).to.not.have.any.keys(\"reservationId\", \"logisticsId\", \"lastEvent\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Diagnóstico no Admin",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/admin/v1/redistributions/{{redistribuicaoId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"sagaState LOGISTICS_SCHEDULED\", () => pm.expect(r.sagaState).to.eql(\"LOGISTICS_SCHEDULED\"));",
+                  "pm.test(\"correlation id da requisição original\", () => pm.expect(r.correlationId).to.eql(\"postman-saga-ok\"));",
+                  "pm.collectionVariables.set(\"logisticaId\", r.logisticsId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Registrar coleta (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/admin/v1/logistics/{{logisticaId}}/collection"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Portal: em trânsito",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{instituicaoToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/portal/v1/redistributions/{{redistribuicaoId}}"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// o evento logistics.food.collected leva a SAGA a IN_TRANSIT",
+                  "setTimeout(() => {}, 2000);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"IN_TRANSIT\", () => pm.expect(pm.response.json().status).to.eql(\"IN_TRANSIT\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Registrar entrega (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/admin/v1/logistics/{{logisticaId}}/delivery"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin: concluída",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/admin/v1/redistributions/{{redistribuicaoId}}"
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// o evento logistics.food.delivered conclui a SAGA",
+                  "setTimeout(() => {}, 2000);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"COMPLETED\", () => pm.expect(pm.response.json().sagaState).to.eql(\"COMPLETED\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6. SAGA (falha, com o logistics parado)",
+      "description": "Antes da pasta: docker compose stop logistics-service. Depois: docker compose start logistics-service.",
+      "item": [
+        {
+          "name": "Publicar oferta para a falha",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{doadorToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/portal/v1/offers",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"foodCategory\": \"FRUITS\",\n  \"description\": \"Frutas da estação\",\n  \"quantity\": 30,\n  \"unit\": \"KG\",\n  \"availableFrom\": \"{{inicio}}\",\n  \"availableUntil\": \"{{fim}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const pad = n => String(n).padStart(2, \"0\");",
+                  "const iso = d => { const off = -d.getTimezoneOffset(), a = Math.abs(off);",
+                  "  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}${off >= 0 ? \"+\" : \"-\"}${pad(Math.floor(a / 60))}:${pad(a % 60)}`; };",
+                  "const agora = new Date();",
+                  "pm.collectionVariables.set(\"inicio\", iso(agora));",
+                  "pm.collectionVariables.set(\"fim\", iso(new Date(agora.getTime() + 6 * 3600 * 1000)));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"ofertaFalhaId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Iniciar redistribuição: FAILED",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{instituicaoToken}}"
+              },
+              {
+                "key": "X-Correlation-ID",
+                "value": "postman-saga-falha"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/portal/v1/redistributions",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"offerId\": \"{{ofertaFalhaId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Rode com o logistics-service parado: a SAGA reserva a oferta, não consegue agendar a coleta e libera a reserva."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"FAILED\", () => pm.expect(r.status).to.eql(\"FAILED\"));",
+                  "pm.test(\"problema em linguagem simples\", () => pm.expect(r.problem).to.be.a(\"string\"));",
+                  "pm.collectionVariables.set(\"redistribuicaoFalhaId\", r.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin: compensação executada",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/admin/v1/redistributions/{{redistribuicaoFalhaId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"compensation DONE\", () => pm.expect(r.compensation).to.eql(\"DONE\"));",
+                  "pm.test(\"motivo visível\", () => pm.expect(r.failureReason).to.include(\"compensação executada\"));",
+                  "pm.test(\"oferta AVAILABLE de novo\", () => pm.expect(r.offer.status).to.eql(\"AVAILABLE\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin: falhas da SAGA",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/admin/v1/redistributions?status=FAILED"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"lista só FAILED\", () => pm.response.json().items.forEach(r => pm.expect(r.sagaState).to.eql(\"FAILED\")));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "7. Outbox (RabbitMQ parado)",
+      "description": "1) docker compose stop rabbitmq; 2) rode as duas primeiras; 3) docker compose start rabbitmq; 4) espere uns 20 s e rode a última.",
+      "item": [
+        {
+          "name": "Publicar oferta com o RabbitMQ parado",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{doadorToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/portal/v1/offers",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"foodCategory\": \"VEGETABLES\",\n  \"description\": \"Cenouras e beterrabas\",\n  \"quantity\": 30,\n  \"unit\": \"KG\",\n  \"availableFrom\": \"{{inicio}}\",\n  \"availableUntil\": \"{{fim}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "A oferta e o evento são gravados na mesma transação; o evento fica PENDING em outbox_events."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const pad = n => String(n).padStart(2, \"0\");",
+                  "const iso = d => { const off = -d.getTimezoneOffset(), a = Math.abs(off);",
+                  "  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}${off >= 0 ? \"+\" : \"-\"}${pad(Math.floor(a / 60))}:${pad(a % 60)}`; };",
+                  "const agora = new Date();",
+                  "pm.collectionVariables.set(\"inicio\", iso(agora));",
+                  "pm.collectionVariables.set(\"fim\", iso(new Date(agora.getTime() + 6 * 3600 * 1000)));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"ofertaOutboxId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ainda fora do modelo de leitura",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{instituicaoToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/portal/v1/offers?category=VEGETABLES&size=100"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "const oferta = pm.response.json().items.find(o => o.id === pm.collectionVariables.get(\"ofertaOutboxId\"));",
+                  "pm.test(\"o evento ainda não saiu\", () => pm.expect(oferta).to.be.undefined);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Depois de religar o RabbitMQ",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{instituicaoToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/portal/v1/offers?category=VEGETABLES&size=100",
+            "description": "Confira também no banco: docker compose exec offer-db psql -U ravita -d offer_db -c \"select status from outbox_events order by created_at desc limit 3\""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "const oferta = pm.response.json().items.find(o => o.id === pm.collectionVariables.get(\"ofertaOutboxId\"));",
+                  "pm.test(\"o publicador entregou o evento pendente\", () => pm.expect(oferta).to.be.an(\"object\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "8. LLM",
+      "item": [
+        {
+          "name": "Pergunta com RAG e tool",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{doadorToken}}"
+              },
+              {
+                "key": "X-Correlation-ID",
+                "value": "postman-llm"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/portal/v1/assistant/questions",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"question\": \"Tenho iogurtes que vencem em 3 dias. Posso doar? Quais instituições de Lavras recebem laticínios?\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"resposta do modelo\", () => pm.expect(r.mode).to.eql(\"llm\"));",
+                  "pm.test(\"fontes da base\", () => pm.expect(r.sources.length).to.be.above(0));",
+                  "pm.test(\"usou a tool instituicoes_que_aceitam\", () => pm.expect(r.consultedData.map(c => c.tool)).to.include(\"instituicoes_que_aceitam\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Pergunta sobre ofertas (tool do modelo de leitura)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{instituicaoToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/portal/v1/assistant/questions",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"question\": \"O que há de hortaliças disponível em Lavras agora?\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"usou buscar_ofertas_disponiveis\", () => pm.expect(pm.response.json().consultedData.map(c => c.tool)).to.include(\"buscar_ofertas_disponiveis\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Fallback (com a chave inválida)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{doadorToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/portal/v1/assistant/questions",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"question\": \"Uma refeição pronta pode ficar quanto tempo aquecida?\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Antes: $env:GOOGLE_API_KEY='invalida'; docker compose up -d assistant-service. Rode 4 vezes: na 4ª o aviso fala em circuito aberto. Depois: Remove-Item Env:GOOGLE_API_KEY; docker compose up -d assistant-service."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test(\"fallback\", () => pm.expect(r.mode).to.eql(\"fallback\"));",
+                  "pm.test(\"trechos da base no fallback\", () => pm.expect(r.answer).to.include(\"6 horas\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Erro: pergunta vazia",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{doadorToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/portal/v1/assistant/questions",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"question\": \" \"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 INVALID_REQUEST\", () => {",
+                  "    pm.response.to.have.status(400);",
+                  "    pm.expect(pm.response.json().code).to.eql(\"INVALID_REQUEST\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "adminToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "doadorToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "instituicaoToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "doadorId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "instituicaoId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "docDoador",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "docInstituicao",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "ofertaId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "ofertaFalhaId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "ofertaOutboxId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "demandaId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "redistribuicaoId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "redistribuicaoFalhaId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "logisticaId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "inicio",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "fim",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}

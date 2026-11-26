@@ -9,20 +9,25 @@ import com.ravita.offer.domain.FoodCategory;
 import com.ravita.offer.domain.Offer;
 import com.ravita.offer.domain.OfferStatus;
 import com.ravita.offer.domain.Unit;
+import com.ravita.offer.outbox.OfferEventType;
+import com.ravita.offer.outbox.OfferOutbox;
 import com.ravita.offer.repository.OfferRepository;
 import com.ravita.offer.repository.OfferSpecifications;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
 
 @Service
@@ -34,17 +39,23 @@ public class OfferService {
 
     private final OfferRepository offerRepository;
     private final OrganizationClient organizationClient;
+    private final OfferOutbox outbox;
+    private final TransactionTemplate transactionTemplate;
     private final Clock clock;
 
-    public OfferService(OfferRepository offerRepository, OrganizationClient organizationClient, Clock clock) {
+    public OfferService(OfferRepository offerRepository, OrganizationClient organizationClient,
+                        OfferOutbox outbox, TransactionTemplate transactionTemplate, Clock clock) {
         this.offerRepository = offerRepository;
         this.organizationClient = organizationClient;
+        this.outbox = outbox;
+        this.transactionTemplate = transactionTemplate;
         this.clock = clock;
     }
 
     /**
-     * CreateOffer. Sem @Transactional de propósito: a chamada HTTP ao organization-service
+     * CreateOffer. Sem @Transactional no método de propósito: a chamada HTTP ao organization-service
      * acontece antes de abrir a transação, para não segurar uma conexão do banco esperando a rede.
+     * A transação só envolve as duas gravações: a oferta e o evento OfferCreated no outbox.
      */
     public Offer create(OfferInput input) {
         Instant now = clock.instant();
@@ -64,7 +75,11 @@ public class OfferService {
 
         Offer offer = Offer.create(input.donorId(), input.foodCategory(), input.description(),
                 input.quantity(), input.unit(), from, until, pickupAddress, now);
-        Offer saved = offerRepository.save(offer);
+        Offer saved = transactionTemplate.execute(status -> {
+            Offer persisted = offerRepository.save(offer);
+            outbox.record(persisted, OfferEventType.OFFER_CREATED, donor.name());
+            return persisted;
+        });
         log.info("Oferta {} criada pelo doador {}", saved.getId(), saved.getDonorId());
         return saved;
     }
@@ -106,14 +121,38 @@ public class OfferService {
         return counts;
     }
 
-    /** ExpireOffer em lote, chamado pelo OfferExpirationJob. */
-    @Transactional
+    /**
+     * ExpireOffer, chamado pelo OfferExpirationJob. Cada oferta vencida é expirada na sua própria
+     * transação, junto com o evento OfferExpired no outbox. Se outra réplica (ou uma reserva) alterou a
+     * oferta ao mesmo tempo, o @Version recusa a gravação e esta oferta é pulada.
+     */
     public int expireOverdue() {
-        int expired = offerRepository.expireOverdue(clock.instant());
+        Instant now = clock.instant();
+        List<String> overdueIds = offerRepository.findOverdueIds(now);
+        int expired = 0;
+        for (String offerId : overdueIds) {
+            try {
+                if (Boolean.TRUE.equals(transactionTemplate.execute(status -> expireOne(offerId, now)))) {
+                    expired++;
+                }
+            } catch (ConcurrencyFailureException changedConcurrently) {
+                log.debug("Oferta {} foi alterada por outra transação; não expirada aqui", offerId);
+            }
+        }
         if (expired > 0) {
             log.info("{} oferta(s) marcada(s) como EXPIRED", expired);
         }
         return expired;
+    }
+
+    private boolean expireOne(String offerId, Instant now) {
+        Offer offer = offerRepository.findById(offerId).orElse(null);
+        if (offer == null || !offer.markExpired(now)) {
+            return false;
+        }
+        offerRepository.saveAndFlush(offer);
+        outbox.record(offer, OfferEventType.OFFER_EXPIRED);
+        return true;
     }
 
     /** Quantity do contrato: positivo, até 3 casas, máximo 999999999.999; UNIT exige inteiro. */

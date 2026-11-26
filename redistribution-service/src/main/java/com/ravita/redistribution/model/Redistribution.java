@@ -32,6 +32,16 @@ public class Redistribution {
     private RedistributionStatus status;
 
     private String failureReason;
+
+    // X-Correlation-ID da requisição que iniciou a SAGA; repassado ao offer-service e ao logistics-service
+    @Column(length = 100)
+    private String correlationId;
+
+    // último passo ou evento da SAGA (RedistributionCreated, OfferReserved, LogisticsScheduled,
+    // FoodCollected, FoodDelivered, ReservationReleased...), usado no diagnóstico do Admin BFF
+    @Column(length = 40)
+    private String lastEvent;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

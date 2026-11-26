@@ -1,0 +1,51 @@
+[
+  {
+    "id": "Q1",
+    "question": "Uma refeição pronta pode ficar quanto tempo aquecida antes de ser doada, e a que temperatura?",
+    "expected": "Acima de 60 °C por no máximo 6 horas (RDC 216/2004, item 4.8.15).",
+    "keywords": ["60", "6 horas"]
+  },
+  {
+    "id": "Q2",
+    "question": "Uma refeição preparada e guardada na geladeira a 4 °C pode ser consumida em até quantos dias?",
+    "expected": "Em até 5 dias a 4 °C ou menos; entre 4 °C e 5 °C, menos que isso (RDC 216/2004, item 4.8.17).",
+    "keywords": ["5 dias"]
+  },
+  {
+    "id": "Q3",
+    "question": "Que informações a etiqueta de uma refeição pronta precisa ter para ser transportada até a instituição?",
+    "expected": "Nome do produto, data de preparo e prazo de validade (RDC 216/2004, item 4.9.1).",
+    "keywords": ["data de preparo", "validade"]
+  },
+  {
+    "id": "Q4",
+    "question": "A Lei 14.016/2020 ainda é a lei que vale para doação de alimentos?",
+    "expected": "Não: foi revogada pela Lei 15.224/2025, que é a norma em vigor.",
+    "keywords": ["15.224", "revog"]
+  },
+  {
+    "id": "Q5",
+    "question": "Se um alimento que eu doei fizer mal a alguém, eu respondo por isso?",
+    "expected": "Só civilmente e só com dolo; a doação não é relação de consumo (Lei 15.224/2025, arts. 15 a 17).",
+    "keywords": ["dolo", "consumo"]
+  },
+  {
+    "id": "Q6",
+    "question": "Na Ravita, posso ofertar 2,5 unidades de pão de forma?",
+    "expected": "Não: na unidade UNIT a quantidade tem de ser inteira; use KG ou arredonde (regras da Ravita).",
+    "keywords": ["inteir"]
+  },
+  {
+    "id": "Q7",
+    "question": "Tenho iogurtes que vencem em 3 dias. Posso doar? Quais instituições recebem laticínios?",
+    "expected": "Sim, dentro da validade e refrigerados; a lista de instituições vem da tool instituicoes_que_aceitam.",
+    "keywords": ["refriger"],
+    "expectedTool": "instituicoes_que_aceitam"
+  },
+  {
+    "id": "Q8",
+    "question": "Qual é a temperatura ideal para armazenar mel em uma colmeia?",
+    "expected": "Fora da base: o assistente deve dizer que não sabe, sem inventar.",
+    "keywords": ["não sei"]
+  }
+]

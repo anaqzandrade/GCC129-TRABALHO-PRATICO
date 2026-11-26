@@ -280,50 +280,113 @@ Nesta etapa estão sendo desenvolvidos:
 
 ### Pré-requisitos
 
-- Docker com Docker Compose v2 (no Windows e no macOS, o Docker Desktop já inclui os dois).
-- Portas livres no host: 8080 a 8084 e 15672.
-- Não é preciso ter Java nem Maven instalados: cada serviço é compilado dentro do próprio container.
+- Docker com Docker Compose v2 (no Windows e no macOS, o Docker Desktop já inclui os dois), com pelo menos 10 GB livres.
+- Porta 8000 livre no host: o API Gateway é a única porta publicada.
+- Não é preciso ter Java, Maven nem Python instalados: cada serviço é compilado dentro do próprio container.
 
-### Subir o sistema
+### Configurar
 
 ```bash
 git clone https://github.com/anaqzandrade/GCC129-TRABALHO-PRATICO.git
 cd GCC129-TRABALHO-PRATICO
-docker compose up --build
+cp .env.example .env          # no PowerShell: Copy-Item .env.example .env
 ```
 
-O primeiro build baixa as dependências Maven de cada serviço e pode levar alguns minutos; os seguintes reaproveitam o cache.
-Usuários e senhas têm valores padrão. Para trocá-los, copie `.env.example` para `.env` antes de subir.
+No `.env`, que não vai para o git:
+
+| Variável | Para quê |
+|---|---|
+| `GOOGLE_API_KEY` | Chave da API do Gemini para o assistente de doação. Crie no [Google AI Studio](https://aistudio.google.com/apikey); o nível gratuito basta e não gera cobrança. Sem a chave, o assistente responde pelo fallback |
+| `JWT_SECRET` | Chave que assina os tokens no gateway (pelo menos 32 caracteres). Tem valor padrão para desenvolvimento |
+| `POSTGRES_USER`, `POSTGRES_PASSWORD`, `RABBITMQ_USER`, `RABBITMQ_PASSWORD` | Credenciais dos bancos e do RabbitMQ. Têm valores padrão |
+
+### Subir o sistema
+
+```bash
+docker compose up -d --build
+docker compose ps             # 17 containers "healthy" em cerca de 1 minuto
+```
+
+O primeiro build baixa as dependências de cada serviço e pode levar alguns minutos; os seguintes reaproveitam o cache.
+Na primeira subida, o assistente grava a base de conhecimento no pgvector (cerca de 1 minuto).
+
+| Página | Endereço |
+|---|---|
+| Portal de doadores e instituições | http://localhost:8000/app/portal/ |
+| Painel administrativo | http://localhost:8000/app/admin/ |
+
+Para testar pelo navegador:
+
+1. No painel administrativo, clique em **Entrar como admin** e cadastre um doador e uma instituição. A lista de
+   organizações mostra o id de cada uma.
+2. No portal, entre como doador com o id dele e publique uma oferta.
+3. Em outra aba, entre no portal como instituição e clique em **Solicitar** na oferta.
+4. No painel, em **Logística**, registre a coleta e depois a entrega, e acompanhe a redistribuição no portal e no
+   diagnóstico do painel.
+
+### Gerar um token
+
+Os tokens são emitidos pelo próprio gateway. As páginas fazem isso no login; pela linha de comando:
+
+```bash
+curl -X POST http://localhost:8000/auth/token -H "Content-Type: application/json" -d '{"role":"ADMIN"}'
+curl -X POST http://localhost:8000/auth/token -H "Content-Type: application/json" -d '{"role":"DONOR","organizationId":"org-..."}'
+curl http://localhost:8000/admin/v1/dashboard -H "Authorization: Bearer <accessToken>"
+```
+
+Papéis: `ADMIN` (acesso a `/admin/v1`), `DONOR` e `INSTITUTION` (acesso a `/portal/v1`, com `organizationId`).
 
 ### Componentes e portas
 
-| Componente | Endereço no host | Banco próprio |
+| Componente | Acesso | Banco próprio |
 |---|---|---|
-| demand-matching-service | http://localhost:8080 | `matching_db` |
-| organization-service | http://localhost:8081 | `organization_db` |
-| offer-service | http://localhost:8082 | `offer_db` |
-| redistribution-service | http://localhost:8083 | `redistribution_db` |
-| logistics-service | http://localhost:8084 | `logistics_db` |
-| RabbitMQ (painel) | http://localhost:15672 (usuário `ravita`, senha `ravita`) | — |
+| **API Gateway** | http://localhost:8000 (única porta publicada) | — |
+| Páginas do portal e do admin (`web`, nginx) | pelo gateway, em `/app/portal/` e `/app/admin/` | — |
+| Portal BFF (doadores e instituições) | pelo gateway, em `/portal/v1` | — |
+| Admin BFF (painel administrativo) | pelo gateway, em `/admin/v1` | — |
+| organization-service | rede interna (8081) | `organization_db` |
+| offer-service | rede interna (8082) | `offer_db` |
+| demand-matching-service | rede interna (8080) | `matching_db` |
+| redistribution-service | rede interna (8083) | `redistribution_db` |
+| logistics-service | rede interna (8084) | `logistics_db` |
+| assistant-service (assistente de doação com LLM) | rede interna (8095); pelo portal em `/portal/v1/assistant/questions` | `assistant_db` (pgvector) |
+| RabbitMQ | rede interna (painel 15672) | — |
 
-Cada serviço tem uma instância própria de PostgreSQL, numa rede interna que só ele acessa. Os bancos não são publicados no host.
-As portas dos serviços ficam publicadas para testes enquanto o API Gateway não existe; na Parte 4, só o gateway será exposto.
+O gateway só alcança as páginas e os BFFs; os BFFs alcançam os serviços. Cada serviço tem o próprio PostgreSQL, numa
+rede interna que só ele acessa. Detalhes no [doc 05](docs/arquitetura/05-containerizacao.md) e no
+[doc 06](docs/arquitetura/06-gateway-bff-implementacao.md).
+
+Para depurar ou usar a coleção "Serviços diretos" do Postman, publique de novo as portas internas:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+```
 
 ### Verificar
 
-```bash
-docker compose ps                                   # todos os containers "running"; bancos, RabbitMQ e offer-service "healthy"
-curl http://localhost:8082/actuator/health          # {"status":"UP"}
-curl http://localhost:8081/api/v1/organizations
-curl http://localhost:8082/api/v1/offers
-curl http://localhost:8080/api/v1/demands
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass       # só no PowerShell, uma vez por janela
+.\scripts\verificacao.ps1
 ```
 
-### Escalar o offer-service
+O script confere, pela porta 8000, cada item da demonstração: portas e redes, ponta a ponta pelo Portal e pelo
+Admin, SAGA (caminho feliz e falha com compensação), CQRS, outbox com o RabbitMQ parado, bancos separados e o
+assistente (tool, fallback e circuit breaker). Leva cerca de 5 minutos e termina com o número de verificações que
+passaram.
 
-Várias réplicas não podem publicar a mesma porta no host. Por isso a escala usa o arquivo
-`docker-compose.scale.yml`, que tira a porta publicada do offer-service. As réplicas continuam
-acessíveis pelos outros serviços na rede `services`, onde o nome `offer-service` resolve para todas elas.
+As mesmas chamadas estão no Postman, em `postman/Ravita - Pelo gateway.postman_collection.json` (importe no Postman;
+os tokens e os ids ficam nas variáveis da coleção).
+
+Testes automatizados de cada módulo, sem precisar de Java ou Python na máquina:
+
+```bash
+docker run --rm -v "${PWD}/offer-service:/app" -w /app maven:3.9.9-eclipse-temurin-21-alpine mvn -q test
+docker build --target test ./assistant-service
+```
+
+(troque `offer-service` por `api-gateway`, `portal-bff`, `admin-bff`, `redistribution-service` ou `logistics-service`).
+
+### Escalar o offer-service
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.scale.yml up -d --scale offer-service=3
@@ -333,8 +396,10 @@ docker compose ps offer-service                     # 3 réplicas: offer-service
 docker compose exec redistribution-service sh -c "for i in 1 2 3 4 5 6 7 8 9; do wget -qO- http://offer-service:8082/api/v1/offers > /dev/null; done"
 docker compose logs offer-service                   # cada linha "GET /api/v1/offers" mostra qual réplica atendeu
 
-docker compose up -d                                # volta a uma réplica, com a porta 8082 publicada
+docker compose up -d                                # volta a uma réplica
 ```
+
+As réplicas não publicam porta e são acessadas na rede `services`, onde o nome `offer-service` resolve para todas.
 
 ### Parar
 
@@ -351,11 +416,14 @@ docker compose down -v     # remove também os volumes: apaga os dados de todos 
 - [03. Database per Service, Consistência Eventual, Dual Write, Outbox e CQRS](./docs/arquitetura/03-dados-outbox-cqrs.md)
 - [04. SAGA de Redistribuição](./docs/arquitetura/04-saga-redistribuicao.md)
 - [05. Containerização com Docker e Docker Compose](./docs/arquitetura/05-containerizacao.md)
+- [06. API Gateway e BFFs: implementação](./docs/arquitetura/06-gateway-bff-implementacao.md)
+- [07. Integração de LLM: assistente de doação](./docs/arquitetura/07-llm.md)
 
 ### Implementação
 
-Os cinco serviços de domínio estão implementados e containerizados, cada um com o próprio Dockerfile e banco de dados.
-O API Gateway, os BFFs e a integração com LLM fazem parte da Parte 4.
+Estão implementados e containerizados os cinco serviços de domínio, o outbox e o CQRS no offer-service, a SAGA de
+redistribuição, o API Gateway, os dois BFFs com as páginas dos clientes e o assistente de doação com RAG, tools e
+mecanismos de resiliência. Cada módulo tem o próprio README com detalhes.
 
 ---
 
@@ -399,3 +467,4 @@ Utilizada para fundamentar os desafios logísticos envolvidos na recuperação e
 
 
 **Link para o video de demonstração Docker - Parte 3:** https://youtu.be/QFMCmb3SMFI
+**Link para o video sistema completo - Parte 4:**https://youtu.be/kiFR7LGBii0

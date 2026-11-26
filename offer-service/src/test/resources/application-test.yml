@@ -1,6 +1,12 @@
 # Perfil de teste: H2 em memória, para `mvn test` rodar sem PostgreSQL nem Docker.
 # O schema de verdade (Flyway) é exercitado quando o serviço sobe com o PostgreSQL.
 spring:
+  # sem RabbitMQ nos testes: o consumidor do modelo de leitura não conecta;
+  # os testes chamam o OfferProjectionConsumer diretamente com o JSON gravado no outbox
+  rabbitmq:
+    listener:
+      simple:
+        auto-startup: false
   datasource:
     url: jdbc:h2:mem:offer_db;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1
     username: sa
@@ -18,3 +24,6 @@ ravita:
   expiration:
     # o job não roda durante os testes; eles chamam expireOverdue() quando precisam
     interval-ms: 3600000
+  outbox:
+    # sem RabbitMQ nos testes: eles conferem as linhas gravadas em outbox_events
+    publisher-enabled: false

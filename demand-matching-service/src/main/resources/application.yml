@@ -18,3 +18,23 @@ spring:
     port: 5672
     username: guest
     password: guest
+    # Um evento que falha 3 vezes seguidas é descartado e fica registrado no log, em vez de voltar
+    # para a fila para sempre e travar os que vêm depois dele.
+    listener:
+      simple:
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 1s
+
+# /actuator/health para o healthcheck do docker-compose. O health inclui o banco
+# e, nos serviços com mensageria, o RabbitMQ.
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
