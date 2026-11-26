@@ -4,9 +4,10 @@
 
 ## 1. Objetivo
 
-Descrever como cada serviço da Ravita é empacotado em imagem Docker e como o sistema completo sobe com um único comando (`docker compose up --build`), com:
+Descrever como cada serviço da Ravita é empacotado em imagem Docker e como o sistema completo sobe com um único comando (`docker compose up --build`): 17 containers, entre os 5 serviços de domínio, o assistente de doação, os 2 BFFs, o API Gateway, as páginas dos clientes, 6 bancos e o RabbitMQ. O desenho inclui:
 
 - um Dockerfile próprio por serviço, em multi-stage build;
+- o API Gateway como única porta publicada no host;
 - um banco PostgreSQL por serviço, com volume para persistência;
 - redes que isolam cada banco do restante do sistema;
 - healthchecks que ordenam a inicialização.
@@ -19,48 +20,42 @@ As instruções de execução estão na seção **Execução** do [README](../..
 
 ```mermaid
 flowchart LR
+    U((navegador)) -->|:8000| GW
+    subgraph bff["rede bff"]
+        GW[api-gateway :8000]
+        WEB[web: páginas]
+        PB[portal-bff]
+        AB[admin-bff]
+    end
     subgraph services["rede services"]
-        ORG[organization-service :8081]
-        OFF[offer-service :8082]
-        MAT[demand-matching-service :8080]
-        RED[redistribution-service :8083]
-        LOG[logistics-service :8084]
+        ORG[organization-service]
+        OFF[offer-service]
+        MAT[demand-matching-service]
+        RED[redistribution-service]
+        LOG[logistics-service]
+        AS[assistant-service]
         MQ[(RabbitMQ)]
     end
-
-    subgraph orgdata["organization-data (interna)"]
-        ORGDB[(organization_db)]
-    end
-    subgraph offdata["offer-data (interna)"]
-        OFFDB[(offer_db)]
-    end
-    subgraph matdata["matching-data (interna)"]
-        MATDB[(matching_db)]
-    end
-    subgraph reddata["redistribution-data (interna)"]
-        REDDB[(redistribution_db)]
-    end
-    subgraph logdata["logistics-data (interna)"]
-        LOGDB[(logistics_db)]
-    end
-
-    ORG --- ORGDB
-    OFF --- OFFDB
-    MAT --- MATDB
-    RED --- REDDB
-    LOG --- LOGDB
-
+    GW --> WEB
+    GW --> PB
+    GW --> AB
+    PB --> ORG & OFF & MAT & RED & LOG & AS
+    AB --> ORG & OFF & RED & LOG
     OFF -->|REST| ORG
-    RED -->|REST| OFF
-    RED -->|REST| LOG
+    RED -->|REST| OFF & LOG
+    AS -->|tools| OFF & ORG
     OFF -->|eventos via outbox| MQ
-    LOG -->|eventos| MQ
-    RED -->|eventos| MQ
-    MQ -->|eventos| RED
-    MQ -->|eventos| MAT
+    LOG & RED -->|eventos| MQ
+    MQ -->|eventos| RED & MAT & OFF
+    ORG --- ORGDB[(organization_db)]
+    OFF --- OFFDB[(offer_db)]
+    MAT --- MATDB[(matching_db)]
+    RED --- REDDB[(redistribution_db)]
+    LOG --- LOGDB[(logistics_db)]
+    AS --- ASDB[(assistant_db<br/>pgvector)]
 ```
 
-Cada serviço participa de duas redes: a rede `services`, compartilhada, e a rede interna do próprio banco. O banco participa apenas da sua rede interna.
+Cada banco fica numa rede interna só com o seu serviço (seção 8). O gateway e as páginas ficam só na rede `bff`; os BFFs ficam nas redes `bff` e `services`. Assim, uma requisição de fora só chega a um serviço de domínio passando por um BFF.
 
 ---
 
@@ -73,6 +68,11 @@ Cada serviço participa de duas redes: a rede `services`, compartilhada, e a red
 | offer-service | `maven:3.9.9-eclipse-temurin-21-alpine` | `eclipse-temurin:21-jre-alpine` | sim | sim | sim | sim |
 | redistribution-service | `maven:3.9.9-eclipse-temurin-21-alpine` | `eclipse-temurin:21-jre-alpine` | sim | não | sim | sim |
 | logistics-service | `maven:3.9.9-eclipse-temurin-21-alpine` | `eclipse-temurin:21-jre-alpine` | sim | não | sim | sim |
+| api-gateway, portal-bff, admin-bff | `maven:3.9.9-eclipse-temurin-21-alpine` | `eclipse-temurin:21-jre-alpine` | sim | sim | sim | sim |
+| assistant-service | `python:3.12-slim` (instala as dependências em `/install`) | `python:3.12-slim` | sim (`requirements.txt` antes do código) | — | sim | sim |
+| web | — (arquivos estáticos) | `nginx:alpine` com o `nginx.conf` próprio | — | — | processos de atendimento do nginx sem root | sim |
+
+O assistant-service tem um terceiro estágio, `test`, que roda os testes (`docker build --target test ./assistant-service`); o `docker compose build` não o executa, porque a imagem final não depende dele.
 
 Todos seguem a mesma estrutura:
 
@@ -139,10 +139,13 @@ Nenhum endereço de banco, broker ou serviço fica fixo na imagem: tudo vem do `
 | offer-service | `SERVER_PORT`, `DB_*`, `RABBITMQ_*`, `ORGANIZATION_SERVICE_URL` |
 | redistribution-service | `SERVER_PORT`, `DB_*`, `RABBITMQ_*`, `OFFER_SERVICE_URL`, `LOGISTICS_SERVICE_URL` |
 | logistics-service | `SERVER_PORT`, `DB_*`, `RABBITMQ_*` |
+| api-gateway | `SERVER_PORT`, `JWT_SECRET`, `PORTAL_BFF_URL`, `ADMIN_BFF_URL`, `WEB_URL` |
+| portal-bff, admin-bff | `SERVER_PORT` e a URL de cada serviço que chamam (`OFFER_SERVICE_URL`, `ASSISTANT_SERVICE_URL`...) |
+| assistant-service | `SERVER_PORT`, `GOOGLE_API_KEY`, `GEMINI_CHAT_MODEL`, `GEMINI_EMBEDDING_MODEL`, `DB_*`, `OFFER_SERVICE_URL`, `ORGANIZATION_SERVICE_URL` |
 
 No demand-matching, o `application.yml` tem valores fixos. As variáveis `SPRING_*` têm precedência sobre ele no Spring Boot, por isso o compose consegue redirecioná-lo sem alterar o código.
 
-Credenciais têm valores padrão no compose e podem ser trocadas em um arquivo `.env` (modelo em `.env.example`; o `.env` não é versionado).
+Credenciais têm valores padrão no compose e podem ser trocadas em um arquivo `.env` (modelo em `.env.example`; o `.env` não é versionado). A `GOOGLE_API_KEY` do assistente e o `JWT_SECRET` do gateway também ficam nele.
 
 ---
 
@@ -150,19 +153,24 @@ Credenciais têm valores padrão no compose e podem ser trocadas em um arquivo `
 
 | Rede | Tipo | Participantes |
 |---|---|---|
-| `services` | bridge | os 5 serviços e o RabbitMQ |
+| `bff` | bridge | api-gateway, web, portal-bff, admin-bff |
+| `services` | bridge | portal-bff, admin-bff, os 5 serviços, assistant-service e RabbitMQ |
 | `organization-data` | interna | organization-service, organization_db |
 | `offer-data` | interna | offer-service, offer_db |
 | `matching-data` | interna | demand-matching-service, matching_db |
 | `redistribution-data` | interna | redistribution-service, redistribution_db |
 | `logistics-data` | interna | logistics-service, logistics_db |
+| `assistant-data` | interna | assistant-service, assistant_db (pgvector) |
 
 Consequências:
 
 - Um serviço só resolve o nome do **próprio** banco. Para o redistribution-service, por exemplo, o nome `offer-db` não existe. Isso reforça o padrão Database per Service na infraestrutura, não apenas por convenção.
 - As redes de banco são `internal`: não têm saída para fora do Docker.
-- Os bancos não publicam porta no host.
+- O gateway não participa da rede `services`: para ele, `offer-service` não existe (`wget` responde `bad address`). Toda requisição de fora passa por um BFF.
+- **Só o api-gateway publica porta no host (8000)**. Serviços, BFFs, assistente, bancos e o painel do RabbitMQ não são acessíveis de fora.
+- Para depurar ou usar a coleção "Serviços diretos" do Postman, o `docker-compose.dev.yml` publica de novo as portas 8080 a 8084, 8091, 8092, 8095 e 15672: `docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d`.
 - Os serviços se encontram pelo nome na rede `services` (DNS do Docker): o redistribution chama `http://offer-service:8082`, por exemplo.
+- O assistant-service sai para a internet (API do Gemini) pela rede `services`, que não é interna.
 
 ---
 
@@ -175,6 +183,7 @@ Consequências:
 | `matching-db-data` | `/var/lib/postgresql/data` do matching-db |
 | `redistribution-db-data` | `/var/lib/postgresql/data` do redistribution-db |
 | `logistics-db-data` | `/var/lib/postgresql/data` do logistics-db |
+| `assistant-db-data` | `/var/lib/postgresql/data` do assistant-db (base vetorial do assistente) |
 | `rabbitmq-data` | `/var/lib/rabbitmq` |
 
 - `docker compose down` remove os containers, mas os volumes e os dados permanecem.
@@ -187,7 +196,9 @@ Consequências:
 
 - **Bancos**: `pg_isready`.
 - **RabbitMQ**: `rabbitmq-diagnostics -q ping`.
-- **Os 5 serviços**: `/actuator/health` (Spring Boot Actuator), que inclui o estado do banco e, no demand-matching, no logistics e no redistribution, o do RabbitMQ. O teste é um único bloco (`x-spring-healthcheck`) reaproveitado pelos cinco: o `wget` usa a variável `SERVER_PORT` de cada container.
+- **Assistente**: `GET /health` com o `urllib` do Python (a imagem slim não tem `wget`).
+- **Páginas (web)**: `GET /healthz` do nginx.
+- **Os 5 serviços, os BFFs e o gateway**: `/actuator/health` (Spring Boot Actuator), que inclui o estado do banco e, no demand-matching, no logistics e no redistribution, o do RabbitMQ. Os BFFs e o gateway não têm banco: o health mostra só que a aplicação está no ar. O teste é um único bloco (`x-spring-healthcheck`) reaproveitado por todos: o `wget` usa a variável `SERVER_PORT` de cada container.
 
 Cada serviço usa `depends_on` com `condition: service_healthy` para o próprio banco e para o RabbitMQ. Sem o healthcheck, o `depends_on` só garantiria que o container do banco foi criado, não que o PostgreSQL já aceita conexões. Dependências entre serviços (offer → organization, redistribution → offer e logistics) usam `service_started`, porque as chamadas REST acontecem durante o uso, não na inicialização.
 
@@ -206,15 +217,16 @@ docker compose -f docker-compose.yml -f docker-compose.scale.yml up -d --scale o
 - O serviço não guarda estado em memória: tudo está no `offer_db`, compartilhado pelas réplicas.
 - Reservas concorrentes em réplicas diferentes continuam corretas: a `Offer` tem controle otimista de versão (`@Version`), e só uma reserva grava (ver doc 04, seção 15).
 - O job de expiração roda em todas as réplicas, mas o UPDATE é idempotente.
-- Duas réplicas não podem publicar a mesma porta no host. O `docker-compose.scale.yml` remove a porta publicada do offer-service (`ports: !reset []`), e as réplicas passam a ser acessadas apenas pela rede `services`.
+- Duas réplicas não podem publicar a mesma porta no host. No compose principal o offer-service já não publica porta; o `docker-compose.scale.yml` (`ports: !reset []`) garante isso também quando ele é combinado com o `docker-compose.dev.yml`. As réplicas são acessadas pela rede `services`.
 - Na rede `services`, o nome `offer-service` passa a resolver para todas as réplicas. Cada requisição gera uma linha de log com método, caminho, status e correlation id, prefixada pelo nome da réplica (`offer-service-1`, `-2`, `-3`) no `docker compose logs`.
 - A JVM guarda a resolução de DNS em cache (30 segundos, por padrão), então chamadas seguidas de um mesmo serviço Java podem ir para a mesma réplica. Na demonstração, as requisições saem de processos `wget` separados, que resolvem o nome a cada execução.
+- No gateway e nos BFFs, o cache de DNS foi reduzido para 5 s. O DNS do Docker responde com validade de 600 s; com cache longo, um BFF ou serviço recriado (com IP novo) ficaria inacessível por minutos, respondendo 503.
 
 ---
 
 ## 12. Limitações e próximos passos
 
-- O API Gateway e os BFFs entram na Parte 4. Até lá, as portas dos serviços ficam publicadas no host para testes; depois, só o gateway será exposto.
+- O rate limiting do gateway fica em memória: com mais de uma instância do gateway, cada uma teria o seu limite. Para isso seria preciso um armazenamento compartilhado, como Redis.
 - O demand-matching-service usa Java 17; os demais usam Java 21.
 
 ---

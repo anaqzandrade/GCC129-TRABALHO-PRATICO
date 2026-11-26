@@ -55,6 +55,8 @@ public class SecurityConfig {
                 .logout(ServerHttpSecurity.LogoutSpec::disable)
                 .authorizeExchange(exchanges -> exchanges
                         .pathMatchers(HttpMethod.POST, "/auth/token").permitAll()
+                        // as páginas são públicas; os dados que elas mostram exigem token nas rotas da API
+                        .pathMatchers(HttpMethod.GET, "/", "/app/**").permitAll()
                         .pathMatchers("/actuator/health", "/actuator/health/**").permitAll()
                         .pathMatchers("/admin/v1/**").hasRole("ADMIN")
                         .pathMatchers("/portal/v1/**").hasAnyRole("DONOR", "INSTITUTION", "ADMIN")

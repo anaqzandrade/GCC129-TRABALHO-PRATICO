@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ravita — Painel administrativo</title>
+  <link rel="stylesheet" href="../shared/style.css">
+</head>
+<body>
+<header>
+  <h1>Ravita · Painel administrativo</h1>
+  <span class="who" id="who"></span>
+  <button class="secondary small hidden" id="logout">Sair</button>
+</header>
+<main>
+  <section id="login-section">
+    <h2>Entrar</h2>
+    <p class="muted">O token de ADMIN é emitido pelo gateway; o Admin BFF só responde a esse perfil.</p>
+    <button id="login">Entrar como admin</button>
+    <div class="msg hidden" id="login-msg"></div>
+  </section>
+
+  <div id="app" class="hidden" style="display:grid; gap:18px">
+    <section>
+      <h2>Indicadores <button class="secondary small" id="refresh-dashboard">Atualizar</button></h2>
+      <div class="cards" id="dashboard"></div>
+      <p class="muted" id="generated"></p>
+    </section>
+
+    <section>
+      <h2>Redistribuições</h2>
+      <div class="row">
+        <label>Status
+          <select id="status-filter">
+            <option value="">Todas</option><option>FAILED</option><option>COMPLETED</option><option>IN_TRANSIT</option>
+            <option>LOGISTICS_PENDING</option><option>CANCELLED</option>
+          </select>
+        </label>
+        <button class="secondary" id="refresh-redistributions">Atualizar</button>
+      </div>
+      <table><thead><tr><th>Redistribuição</th><th>Status</th><th>Estado da SAGA</th><th>Último evento</th><th>Motivo da falha</th><th></th></tr></thead>
+        <tbody id="redistributions"></tbody></table>
+      <div id="detail" class="hidden"><h2 style="margin-top:16px">Diagnóstico</h2><div id="detail-body"></div></div>
+      <div class="msg hidden" id="redistribution-msg"></div>
+    </section>
+
+    <section>
+      <h2>Logística</h2>
+      <div class="row">
+        <label>Status
+          <select id="logistics-filter"><option value="SCHEDULED">SCHEDULED</option><option value="COLLECTED">COLLECTED</option>
+            <option value="DELIVERED">DELIVERED</option><option value="FAILED">FAILED</option><option value="">Todas</option></select>
+        </label>
+        <button class="secondary" id="refresh-logistics">Atualizar</button>
+      </div>
+      <table><thead><tr><th>Operação</th><th>Coleta</th><th>Entrega</th><th>Status</th><th></th></tr></thead>
+        <tbody id="logistics"></tbody></table>
+      <div class="msg hidden" id="logistics-msg"></div>
+    </section>
+
+    <section>
+      <h2>Organizações</h2>
+      <table><thead><tr><th>Nome</th><th>Tipo</th><th>Cidade</th><th>Id (para entrar no portal)</th></tr></thead>
+        <tbody id="organizations"></tbody></table>
+      <h2 style="margin-top:18px">Cadastrar organização</h2>
+      <form id="organization-form" class="grid">
+        <label style="grid-column: span 2">Nome <input name="name" required maxlength="150"></label>
+        <label>Tipo <select name="type" id="org-type"><option value="DONOR">Doador</option><option value="INSTITUTION">Instituição</option></select></label>
+        <label>CNPJ (14 dígitos) <input name="document" required pattern="\d{14}"></label>
+        <label>Rua <input name="street" required value="Rua Central"></label>
+        <label>Número <input name="number" required value="100"></label>
+        <label>Bairro <input name="district" required value="Centro"></label>
+        <label>Cidade <input name="city" required value="Lavras"></label>
+        <label>UF <input name="state" required maxlength="2" value="MG"></label>
+        <label>CEP <input name="postalCode" required value="37200000"></label>
+        <label class="capacity">Recebe <select name="capacityCategory" id="capacity-category"></select></label>
+        <label class="capacity">Capacidade <input name="maxQuantity" type="number" min="1" value="50"></label>
+        <label class="capacity">Unidade <select name="capacityUnit"><option>KG</option><option>L</option><option>UNIT</option></select></label>
+        <div class="row"><button>Cadastrar</button></div>
+      </form>
+      <div class="msg hidden" id="organization-msg"></div>
+    </section>
+  </div>
+</main>
+<script src="../shared/api.js"></script>
+<script src="admin.js"></script>
+</body>
+</html>

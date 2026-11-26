@@ -46,7 +46,8 @@ public class RateLimitWebFilter implements WebFilter {
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
         String path = exchange.getRequest().getURI().getPath();
-        if (path.startsWith("/actuator")) {
+        // health e arquivos estáticos das páginas não contam: abrir uma página carrega vários arquivos
+        if (path.startsWith("/actuator") || path.startsWith("/app/") || "/".equals(path)) {
             return chain.filter(exchange);
         }
         if (buckets.size() > MAX_CLIENTS) {

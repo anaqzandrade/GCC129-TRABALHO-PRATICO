@@ -24,6 +24,19 @@ spring:
               uri: ${ADMIN_BFF_URL:http://localhost:8092}
               predicates:
                 - Path=/admin/v1/**
+            # os dois clientes (páginas estáticas no container web), na mesma origem da API: sem CORS
+            - id: web
+              uri: ${WEB_URL:http://localhost:8090}
+              predicates:
+                - Path=/app/**
+              filters:
+                - StripPrefix=1
+            - id: home
+              uri: no://op
+              predicates:
+                - Path=/
+              filters:
+                - RedirectTo=302, /app/portal/
 
 ravita:
   jwt:

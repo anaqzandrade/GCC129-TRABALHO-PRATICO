@@ -1,0 +1,34 @@
+# Sobreposição para depuração: publica de novo as portas dos serviços, dos BFFs, do assistente e do
+# painel do RabbitMQ, como na Parte 3. Útil para a coleção "Serviços diretos" do Postman.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+#
+# Sem este arquivo, só o API Gateway (8000) fica exposto. Para voltar: docker compose up -d
+services:
+  rabbitmq:
+    ports:
+      - "15672:15672"   # painel de administração (usuário e senha do .env)
+  organization-service:
+    ports:
+      - "8081:8081"
+  offer-service:
+    ports:
+      - "8082:8082"
+  demand-matching-service:
+    ports:
+      - "8080:8080"
+  redistribution-service:
+    ports:
+      - "8083:8083"
+  logistics-service:
+    ports:
+      - "8084:8084"
+  assistant-service:
+    ports:
+      - "8095:8095"
+  portal-bff:
+    ports:
+      - "8091:8091"
+  admin-bff:
+    ports:
+      - "8092:8092"

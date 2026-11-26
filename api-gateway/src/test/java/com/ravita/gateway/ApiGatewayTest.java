@@ -18,6 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
         "PORTAL_BFF_URL=http://localhost:1",
         "ADMIN_BFF_URL=http://localhost:1",
+        "WEB_URL=http://localhost:1",
         "ravita.rate-limit.capacity=10",
         "ravita.rate-limit.refill-period=1h"
 })
@@ -29,6 +30,23 @@ class ApiGatewayTest {
     @Test
     void issuesATokenForAKnownRole() {
         assertThat(token("DONOR", "org-1")).contains(".");
+    }
+
+    @Test
+    void rootRedirectsToThePortalPage() {
+        client.get().uri("/")
+                .exchange()
+                .expectStatus().isFound()
+                .expectHeader().valueEquals("Location", "/app/portal/");
+    }
+
+    @Test
+    void pagesNeedNoTokenAndAreServedByTheWebContainer() {
+        // sem token e sem 401: a requisição chega à rota do container web, que no teste não existe
+        client.get().uri("/app/portal/")
+                .exchange()
+                .expectStatus().isEqualTo(503)
+                .expectBody().jsonPath("$.code").isEqualTo("SERVICE_UNAVAILABLE");
     }
 
     @Test

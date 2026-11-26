@@ -2,9 +2,10 @@
 #
 #   docker compose -f docker-compose.yml -f docker-compose.scale.yml up -d --scale offer-service=3
 #
-# Várias réplicas não podem publicar a mesma porta no host, então aqui o offer-service deixa de
-# publicar a 8082. As réplicas continuam acessíveis na rede "services" pelo nome offer-service,
-# que o DNS do Docker resolve para todas elas. Para voltar ao normal: docker compose up -d
+# Várias réplicas não podem publicar a mesma porta no host. No compose principal o offer-service já
+# não publica porta; este arquivo garante isso também quando combinado com o docker-compose.dev.yml
+# (que publica a 8082). As réplicas ficam acessíveis na rede "services" pelo nome offer-service, que o
+# DNS do Docker resolve para todas elas. Para voltar ao normal: docker compose up -d
 services:
   offer-service:
     ports: !reset []

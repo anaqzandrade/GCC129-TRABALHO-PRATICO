@@ -13,6 +13,8 @@ concentra o que vale para toda requisição. Regra de negócio fica fora dele.
 | `POST /auth/token` | o próprio gateway (token de desenvolvimento) | qualquer um |
 | `/portal/v1/**` | Portal BFF (`portal-bff:8091`) | `DONOR`, `INSTITUTION` ou `ADMIN` |
 | `/admin/v1/**` | Admin BFF (`admin-bff:8092`) | só `ADMIN` |
+| `GET /app/**` | páginas do portal e do admin (`web:80`, sem o prefixo `/app`) | qualquer um: as páginas não têm dados |
+| `GET /` | redireciona para `/app/portal/` | qualquer um |
 | qualquer outra | — | ninguém (401 sem token, 403 com token) |
 
 As rotas `/api/v1/**` dos serviços não passam pelo gateway. No compose, ele só está na rede `bff`:
@@ -24,7 +26,7 @@ não alcança os serviços de domínio, só os BFFs.
 |---|---|---|
 | Correlation ID | `CorrelationIdWebFilter` | Usa o `X-Correlation-ID` recebido ou gera um; repassa ao BFF e devolve na resposta. Primeiro filtro de todos |
 | Log | `CorrelationIdWebFilter` | Uma linha por requisição: método, caminho, status, duração e correlation id |
-| Rate limiting | `RateLimitWebFilter` | Token bucket por cliente (token ou IP): 20 de rajada, recarga de 2 por segundo. Sem ficha: `429 RATE_LIMITED` e `Retry-After` |
+| Rate limiting | `RateLimitWebFilter` | Token bucket por cliente (token ou IP): 20 de rajada, recarga de 2 por segundo. Sem ficha: `429 RATE_LIMITED` e `Retry-After`. Health e arquivos das páginas não contam |
 | Autenticação | `SecurityConfig` | JWT HS256 assinado com `JWT_SECRET`; confere assinatura, emissor e validade. Sem token válido: `401 UNAUTHENTICATED` |
 | Autorização por rota | `SecurityConfig` | A claim `roles` do token decide a rota. Papel errado: `403 FORBIDDEN` |
 | Identidade para os BFFs | `IdentityHeadersFilter` | Descarta `X-User-Id`, `X-Org-Id` e `X-Roles` vindos do cliente e preenche de novo a partir do token |

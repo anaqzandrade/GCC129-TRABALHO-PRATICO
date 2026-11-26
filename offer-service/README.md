@@ -39,6 +39,9 @@ docker compose up --build
 curl http://localhost:8082/actuator/health
 ```
 
+No compose da raiz do repositório, a porta 8082 não é publicada: o acesso de fora é pelo gateway. Para usar os
+exemplos abaixo com o sistema completo, suba com `docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d`.
+
 Para criar uma oferta, o organization-service precisa estar rodando, porque o doador é validado nele.
 Sem ele, `POST /offers` responde `503 DEPENDENCY_UNAVAILABLE`. As consultas e as reservas funcionam mesmo assim.
 

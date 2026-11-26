@@ -22,6 +22,7 @@ sem campos internos e com links para o próximo passo. Não tem banco e não alt
 | `GET /redistributions` | `INSTITUTION`, `ADMIN` | Redistribuições da instituição | redistribution |
 | `GET /redistributions/{id}` | participantes, `ADMIN` | Andamento, agregando três serviços | redistribution, offer, logistics |
 | `POST /redistributions/{id}/cancellation` | instituição dona | Cancela enquanto a coleta não aconteceu | redistribution |
+| `POST /assistant/questions` | todos | Pergunta ao assistente de doação; repassa só a pergunta (doc 07) | assistant |
 
 A identidade chega nos cabeçalhos `X-User-Id`, `X-Org-Id` e `X-Roles`, preenchidos pelo gateway a partir
 do token. Recurso de outra organização responde `404`, para não revelar que ele existe.
