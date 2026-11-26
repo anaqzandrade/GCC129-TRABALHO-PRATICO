@@ -254,6 +254,58 @@ services:
     healthcheck: *spring-healthcheck
     restart: unless-stopped
 
+  # ---------------------------------------------------------------- BFFs (só o gateway os alcança, pela rede bff)
+  portal-bff:
+    build: ./portal-bff
+    image: ravita/portal-bff:0.0.1
+    environment:
+      SERVER_PORT: 8091
+      OFFER_SERVICE_URL: http://offer-service:8082
+      ORGANIZATION_SERVICE_URL: http://organization-service:8081
+      MATCHING_SERVICE_URL: http://demand-matching-service:8080
+      REDISTRIBUTION_SERVICE_URL: http://redistribution-service:8083
+      LOGISTICS_SERVICE_URL: http://logistics-service:8084
+    depends_on:
+      offer-service:
+        condition: service_started
+      organization-service:
+        condition: service_started
+      demand-matching-service:
+        condition: service_started
+      redistribution-service:
+        condition: service_started
+      logistics-service:
+        condition: service_started
+    networks:
+      - bff        # recebe as requisições do gateway
+      - services   # chama os serviços de domínio
+    healthcheck: *spring-healthcheck
+    restart: unless-stopped
+
+  admin-bff:
+    build: ./admin-bff
+    image: ravita/admin-bff:0.0.1
+    environment:
+      SERVER_PORT: 8092
+      OFFER_SERVICE_URL: http://offer-service:8082
+      ORGANIZATION_SERVICE_URL: http://organization-service:8081
+      REDISTRIBUTION_SERVICE_URL: http://redistribution-service:8083
+      LOGISTICS_SERVICE_URL: http://logistics-service:8084
+    depends_on:
+      offer-service:
+        condition: service_started
+      organization-service:
+        condition: service_started
+      redistribution-service:
+        condition: service_started
+      logistics-service:
+        condition: service_started
+    networks:
+      - bff
+      - services
+    healthcheck: *spring-healthcheck
+    restart: unless-stopped
+
   # ---------------------------------------------------------------- API Gateway (única entrada externa)
   api-gateway:
     build: ./api-gateway
@@ -263,6 +315,11 @@ services:
       JWT_SECRET: ${JWT_SECRET:-ravita-dev-secret-troque-no-env-2026}
       PORTAL_BFF_URL: http://portal-bff:8091
       ADMIN_BFF_URL: http://admin-bff:8092
+    depends_on:
+      portal-bff:
+        condition: service_started
+      admin-bff:
+        condition: service_started
     networks:
       # só alcança os BFFs (rede bff), nunca os serviços de domínio
       - bff

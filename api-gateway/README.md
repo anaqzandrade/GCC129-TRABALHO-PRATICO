@@ -30,6 +30,10 @@ não alcança os serviços de domínio, só os BFFs.
 | Identidade para os BFFs | `IdentityHeadersFilter` | Descarta `X-User-Id`, `X-Org-Id` e `X-Roles` vindos do cliente e preenche de novo a partir do token |
 | Erros | `GatewayErrorHandler` | BFF fora do ar: `503 SERVICE_UNAVAILABLE`; sem resposta em 15 s: `504`. Sempre `{code, message, correlationId}` |
 
+O cliente HTTP que chama os BFFs guarda a resolução de nomes por no máximo 5 s (`HttpClientConfig`). O DNS do
+Docker responde com TTL de 600 s; com esse valor, depois que um BFF é recriado e ganha outro IP, o gateway
+continuaria chamando o IP antigo por até 10 minutos e respondendo 503.
+
 O rate limiting fica em memória, o que basta para uma instância do gateway. Com várias réplicas,
 o balde precisaria ficar num armazenamento compartilhado, como o Redis.
 
@@ -52,7 +56,7 @@ $t = (Invoke-RestMethod -Method Post http://localhost:8000/auth/token -ContentTy
 
 curl.exe -i http://localhost:8000/portal/v1/offers                                  # 401 UNAUTHENTICATED
 curl.exe -i -H "Authorization: Bearer $t" http://localhost:8000/admin/v1/dashboard  # 403 FORBIDDEN
-curl.exe -i -H "Authorization: Bearer $t" http://localhost:8000/portal/v1/offers    # 503 enquanto o Portal BFF não existe
+curl.exe -i -H "Authorization: Bearer $t" http://localhost:8000/portal/v1/offers    # 200: ofertas disponíveis, pelo Portal BFF
 curl.exe -i -H "X-Correlation-ID: demo-1" http://localhost:8000/portal/v1/offers    # devolve X-Correlation-ID: demo-1
 1..25 | ForEach-Object { curl.exe -s -o NUL -w "%{http_code} " http://localhost:8000/portal/v1/offers }   # 401 ... e depois 429
 docker compose logs api-gateway --since 2m                                           # uma linha por requisição

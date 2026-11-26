@@ -300,6 +300,8 @@ Usuários e senhas têm valores padrão. Para trocá-los, copie `.env.example` p
 | Componente | Endereço no host | Banco próprio |
 |---|---|---|
 | **API Gateway** | http://localhost:8000 | — |
+| Portal BFF (doadores e instituições) | só pelo gateway, em `/portal/v1` | — |
+| Admin BFF (painel administrativo) | só pelo gateway, em `/admin/v1` | — |
 | demand-matching-service | http://localhost:8080 | `matching_db` |
 | organization-service | http://localhost:8081 | `organization_db` |
 | offer-service | http://localhost:8082 | `offer_db` |
@@ -309,13 +311,14 @@ Usuários e senhas têm valores padrão. Para trocá-los, copie `.env.example` p
 
 Cada serviço tem uma instância própria de PostgreSQL, numa rede interna que só ele acessa. Os bancos não são publicados no host.
 O API Gateway é a entrada externa: encaminha `/portal/v1/**` e `/admin/v1/**` para os BFFs e cuida de autenticação,
-rate limiting e correlation ID (detalhes em [api-gateway/README.md](api-gateway/README.md)). As portas dos serviços
-continuam publicadas para testes até os BFFs ficarem prontos; depois, só o gateway ficará exposto.
+rate limiting e correlation ID (detalhes em [api-gateway/README.md](api-gateway/README.md)). Os BFFs não têm porta
+publicada: [portal-bff](portal-bff/README.md) e [admin-bff](admin-bff/README.md) só recebem requisições do gateway.
+Por enquanto, as portas dos serviços de domínio continuam publicadas para testes diretos.
 
 ### Verificar
 
 ```bash
-docker compose ps                                   # os 12 containers "healthy": bancos, RabbitMQ, os 5 serviços e o gateway
+docker compose ps                                   # os 14 containers "healthy": bancos, RabbitMQ, os 5 serviços, os 2 BFFs e o gateway
 curl http://localhost:8082/actuator/health          # {"status":"UP"}
 curl http://localhost:8081/api/v1/organizations
 curl http://localhost:8082/api/v1/offers
